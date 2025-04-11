@@ -62,37 +62,26 @@ function showAlert(message, type = 'danger') {
 
 // Initialize the page
 async function init() {
-    try {
-        // Redirect if not authenticated
-        if (!isAuthenticated()) {
-            window.location.href = '/login.html';
-            return;
-        }
-        
-        // Load data
-        try {
-            await loadCategoriesAndPhases();
-        } catch (error) {
-            console.error('Error loading categories and phases:', error);
-        }
-        
-        try {
-            await loadLocations();
-        } catch (error) {
-            console.error('Error loading locations:', error);
-        }
-        
-        try {
-            await loadEvents();
-        } catch (error) {
-            console.error('Error loading events:', error);
-        }
-        
-        // Setup event listeners
-        setupEventListeners();
-    } catch (error) {
-        console.error('Error initializing page:', error);
+  try {
+    // Redirect if not authenticated
+    if (!isAuthenticated()) {
+      window.location.href = '/login.html';
+      return;
     }
+    
+    // Load data
+    try {
+      await loadCategoriesAndPhases();
+    } catch (error) {
+      console.error('Error loading categories and phases:', error);
+      // Add this line to use default values if API fails
+      initializeDefaultCategoriesAndPhases();
+    }
+    
+    // Rest of your init function...
+  } catch (error) {
+    console.error('Error initializing page:', error);
+  }
 }
 
 // Load question categories and phases
@@ -401,7 +390,6 @@ function showQrCode(accessCode) {
         `;
     }
 }
-
 // Select an event
 function selectEvent(eventId) {
     const eventSelect = document.getElementById('event-select');
@@ -418,3 +406,40 @@ function selectEvent(eventId) {
         showAlert('Event selected!', 'success');
     }
 }
+
+// Add this function to your events.js file
+function initializeDefaultCategoriesAndPhases() {
+  // Default categories
+  const defaultCategories = [
+    'Icebreaker',
+    'Personal',
+    'Opinion',
+    'Reflective',
+    'Hypothetical',
+    'Challenge'
+  ];
+  
+  // Default phases
+  const defaultPhases = [
+    'Warm-Up',
+    'Personal',
+    'Reflective',
+    'Challenge'
+  ];
+  
+  // Populate category dropdown
+  const categoryDropdown = document.getElementById('question-category');
+  if (categoryDropdown) {
+    populateDropdown(categoryDropdown, defaultCategories);
+  }
+  
+  // Populate phase dropdown
+  const phaseDropdown = document.getElementById('question-phase');
+  if (phaseDropdown) {
+    populateDropdown(phaseDropdown, defaultPhases);
+  }
+}
+
+// Call this function in your init() function
+// Add this line after the loadCategoriesAndPhases() call:
+// initializeDefaultCategoriesAndPhases();
