@@ -60,28 +60,91 @@ function showAlert(message, type = 'danger') {
     }, 3000);
 }
 
+// Add this function to your events.js file
+function initializeDefaultCategoriesAndPhases() {
+    // Default categories
+    const defaultCategories = [
+        'Icebreaker',
+        'Personal',
+        'Opinion',
+        'Reflective',
+        'Hypothetical',
+        'Challenge'
+    ];
+    
+    // Default phases
+    const defaultPhases = [
+        'Warm-Up',
+        'Personal',
+        'Reflective',
+        'Challenge'
+    ];
+    
+    // Populate category dropdown
+    const categoryDropdown = document.getElementById('question-category');
+    if (categoryDropdown) {
+        populateDropdown(categoryDropdown, defaultCategories);
+    }
+    
+    // Populate phase dropdown
+    const phaseDropdown = document.getElementById('question-phase');
+    if (phaseDropdown) {
+        populateDropdown(phaseDropdown, defaultPhases);
+    }
+}
+
 // Initialize the page
 async function init() {
-  try {
-    // Redirect if not authenticated
-    if (!isAuthenticated()) {
-      window.location.href = '/login.html';
-      return;
-    }
-    
-    // Load data
     try {
-      await loadCategoriesAndPhases();
+        // Redirect if not authenticated
+        if (!isAuthenticated()) {
+            window.location.href = '/login.html';
+            return;
+        }
+        
+        // Load data
+        try {
+            await loadCategoriesAndPhases();
+        } catch (error) {
+            console.error('Error loading categories and phases:', error);
+            // Add this line to use default values if API fails
+            initializeDefaultCategoriesAndPhases();
+        }
+        
+        try {
+            await loadLocations();
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+        
+        try {
+            await loadEvents();
+        } catch (error) {
+            console.error('Error loading events:', error);
+        }
+        
+        // Setup event listeners
+        setupEventListeners();
+        
+        // Show questions and deck sections if event is selected
+        const eventSelect = document.getElementById('event-select');
+        if (eventSelect && eventSelect.value) {
+            const questionsSection = document.getElementById('questions-section');
+            const deckSection = document.getElementById('deck-section');
+            
+            if (questionsSection) questionsSection.style.display = 'block';
+            if (deckSection) deckSection.style.display = 'block';
+        }
+        
+        // Initialize feedback event select
+        const feedbackEventSelect = document.getElementById('feedback-event-select');
+        if (feedbackEventSelect) {
+            const events = await apiRequest('/api/events', 'GET');
+            populateDropdown(feedbackEventSelect, events, 'id', 'name');
+        }
     } catch (error) {
-      console.error('Error loading categories and phases:', error);
-      // Add this line to use default values if API fails
-      initializeDefaultCategoriesAndPhases();
+        console.error('Error initializing page:', error);
     }
-    
-    // Rest of your init function...
-  } catch (error) {
-    console.error('Error initializing page:', error);
-  }
 }
 
 // Load question categories and phases
@@ -179,76 +242,12 @@ function setupEventListeners() {
     } else {
         console.warn('Generate deck form not found');
     }
-}
-// Add this to your setupEventListeners function
-function setupEventListeners() {
-  // Existing code...
-  
-  // Feedback button
-  const loadFeedbackBtn = document.getElementById('load-feedback-btn');
-  if (loadFeedbackBtn) {
-    loadFeedbackBtn.addEventListener('click', loadFeedbackData);
-  }
-}
-
-// Add this new function
-async function loadFeedbackData() {
-  const eventId = document.getElementById('feedback-event-select').value;
-  if (!eventId) {
-    showAlert('Please select an event');
-    return;
-  }
-  
-  try {
-    // First get questions for this event
-    const questions = await apiRequest(`/api/questions/${eventId}`, 'GET');
     
-    // For each question, get feedback stats
-    const feedbackContainer = document.getElementById('feedback-container');
-    feedbackContainer.innerHTML = '<h3>Question Feedback</h3>';
-    
-    if (questions.length === 0) {
-      feedbackContainer.innerHTML += '<p>No questions found for this event.</p>';
-      return;
+    // Feedback button
+    const loadFeedbackBtn = document.getElementById('load-feedback-btn');
+    if (loadFeedbackBtn) {
+        loadFeedbackBtn.addEventListener('click', loadFeedbackData);
     }
-    
-    const feedbackTable = document.createElement('table');
-    feedbackTable.innerHTML = `
-      <tr>
-        <th>Question</th>
-        <th>Category</th>
-        <th>Phase</th>
-        <th>Likes</th>
-        <th>Dislikes</th>
-        <th>Like Rate</th>
-      </tr>
-    `;
-    
-    for (const question of questions) {
-      try {
-        const stats = await apiRequest(`/api/feedback/stats/${question.id}`, 'GET');
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${question.text}</td>
-          <td>${question.category || 'N/A'}</td>
-          <td>${question.deckPhase || 'N/A'}</td>
-          <td>${stats.likes || 0}</td>
-          <td>${stats.dislikes || 0}</td>
-          <td>${stats.likeRate ? (stats.likeRate * 100).toFixed(1) + '%' : 'N/A'}</td>
-        `;
-        
-        feedbackTable.appendChild(row);
-      } catch (error) {
-        console.error(`Error getting feedback for question ${question.id}:`, error);
-      }
-    }
-    
-    feedbackContainer.appendChild(feedbackTable);
-  } catch (error) {
-    console.error('Error loading feedback data:', error);
-    showAlert('Error loading feedback data');
-  }
 }
 
 // Load events
@@ -450,7 +449,7 @@ async function handleGenerateDeck(e) {
 function showQrCode(accessCode) {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${window.location.origin}/participant.html?code=${accessCode}`;
     
-    const qrContainer = document.getElementById('qr-container') ;
+    const qrContainer = document.getElementById('qr-container');
     if (qrContainer) {
         qrContainer.innerHTML = `
             <h3>QR Code</h3>
@@ -460,6 +459,7 @@ function showQrCode(accessCode) {
         `;
     }
 }
+
 // Select an event
 function selectEvent(eventId) {
     const eventSelect = document.getElementById('event-select');
@@ -477,39 +477,66 @@ function selectEvent(eventId) {
     }
 }
 
-// Add this function to your events.js file
-function initializeDefaultCategoriesAndPhases() {
-  // Default categories
-  const defaultCategories = [
-    'Icebreaker',
-    'Personal',
-    'Opinion',
-    'Reflective',
-    'Hypothetical',
-    'Challenge'
-  ];
-  
-  // Default phases
-  const defaultPhases = [
-    'Warm-Up',
-    'Personal',
-    'Reflective',
-    'Challenge'
-  ];
-  
-  // Populate category dropdown
-  const categoryDropdown = document.getElementById('question-category');
-  if (categoryDropdown) {
-    populateDropdown(categoryDropdown, defaultCategories);
-  }
-  
-  // Populate phase dropdown
-  const phaseDropdown = document.getElementById('question-phase');
-  if (phaseDropdown) {
-    populateDropdown(phaseDropdown, defaultPhases);
-  }
+// Load feedback data
+async function loadFeedbackData() {
+    const eventId = document.getElementById('feedback-event-select').value;
+    if (!eventId) {
+        showAlert('Please select an event');
+        return;
+    }
+    
+    try {
+        // First get questions for this event
+        const questions = await apiRequest(`/api/questions/${eventId}`, 'GET');
+        
+        // For each question, get feedback stats
+        const feedbackContainer = document.getElementById('feedback-container');
+        feedbackContainer.innerHTML = '<h3>Question Feedback</h3>';
+        
+        if (questions.length === 0) {
+            feedbackContainer.innerHTML += '<p>No questions found for this event.</p>';
+            return;
+        }
+        
+        const feedbackTable = document.createElement('table');
+        feedbackTable.style.width = '100%';
+        feedbackTable.style.borderCollapse = 'collapse';
+        feedbackTable.style.marginTop = '1rem';
+        feedbackTable.innerHTML = `
+            <tr style="background-color: #f2f2f2;">
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Question</th>
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Category</th>
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Phase</th>
+                <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Likes</th>
+                <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Dislikes</th>
+                <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Like Rate</th>
+            </tr>
+        `;
+        
+        for (const question of questions) {
+            try {
+                const stats = await apiRequest(`/api/feedback/stats/${question.id}`, 'GET');
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${question.text}</td>
+                    <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${question.category || 'N/A'}</td>
+                    <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${question.deckPhase || 'N/A'}</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${stats.likes || 0}</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${stats.dislikes || 0}</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${stats.likeRate ? (stats.likeRate * 100).toFixed(1) + '%' : 'N/A'}</td>
+                `;
+                
+                feedbackTable.appendChild(row);
+            } catch (error) {
+                console.error(`Error getting feedback for question ${question.id}:`, error);
+            }
+        }
+        
+        feedbackContainer.appendChild(feedbackTable);
+        showAlert('Feedback data loaded successfully!', 'success');
+    } catch (error) {
+        console.error('Error loading feedback data:', error);
+        showAlert('Error loading feedback data');
+    }
 }
-
-// Call this function in your init() function
-// Add this line after the loadCategoriesAndPhases() call:
-// initializeDefaultCategoriesAndPhases();
