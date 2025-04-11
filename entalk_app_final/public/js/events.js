@@ -180,6 +180,76 @@ function setupEventListeners() {
         console.warn('Generate deck form not found');
     }
 }
+// Add this to your setupEventListeners function
+function setupEventListeners() {
+  // Existing code...
+  
+  // Feedback button
+  const loadFeedbackBtn = document.getElementById('load-feedback-btn');
+  if (loadFeedbackBtn) {
+    loadFeedbackBtn.addEventListener('click', loadFeedbackData);
+  }
+}
+
+// Add this new function
+async function loadFeedbackData() {
+  const eventId = document.getElementById('feedback-event-select').value;
+  if (!eventId) {
+    showAlert('Please select an event');
+    return;
+  }
+  
+  try {
+    // First get questions for this event
+    const questions = await apiRequest(`/api/questions/${eventId}`, 'GET');
+    
+    // For each question, get feedback stats
+    const feedbackContainer = document.getElementById('feedback-container');
+    feedbackContainer.innerHTML = '<h3>Question Feedback</h3>';
+    
+    if (questions.length === 0) {
+      feedbackContainer.innerHTML += '<p>No questions found for this event.</p>';
+      return;
+    }
+    
+    const feedbackTable = document.createElement('table');
+    feedbackTable.innerHTML = `
+      <tr>
+        <th>Question</th>
+        <th>Category</th>
+        <th>Phase</th>
+        <th>Likes</th>
+        <th>Dislikes</th>
+        <th>Like Rate</th>
+      </tr>
+    `;
+    
+    for (const question of questions) {
+      try {
+        const stats = await apiRequest(`/api/feedback/stats/${question.id}`, 'GET');
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${question.text}</td>
+          <td>${question.category || 'N/A'}</td>
+          <td>${question.deckPhase || 'N/A'}</td>
+          <td>${stats.likes || 0}</td>
+          <td>${stats.dislikes || 0}</td>
+          <td>${stats.likeRate ? (stats.likeRate * 100).toFixed(1) + '%' : 'N/A'}</td>
+        `;
+        
+        feedbackTable.appendChild(row);
+      } catch (error) {
+        console.error(`Error getting feedback for question ${question.id}:`, error);
+      }
+    }
+    
+    feedbackContainer.appendChild(feedbackTable);
+  } catch (error) {
+    console.error('Error loading feedback data:', error);
+    showAlert('Error loading feedback data');
+  }
+}
 
 // Load events
 async function loadEvents() {
