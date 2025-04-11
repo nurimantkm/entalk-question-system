@@ -1,319 +1,356 @@
-// participant.js - Enhanced with swipe interface for question feedback
+// participant.js - Handles the participant interface for answering questions
+document.addEventListener('DOMContentLoaded', function() {
+    // Only initialize if we're on the participant page
+    if (window.location.pathname.includes('participant.html')) {
+        init();
+    }
+});
 
-// DOM Elements
-const questionContainer = document.getElementById('question-container');
-const loadingSpinner = document.getElementById('loading-spinner');
-const noQuestionsMessage = document.getElementById('no-questions-message');
-const completionMessage = document.getElementById('completion-message');
-const progressCounter = document.getElementById('progress-counter');
-const categoryLabel = document.getElementById('category-label');
-
-// State
-let currentQuestions = [];
+// Global variables
 let currentQuestionIndex = 0;
-let eventId = '';
-let locationId = '';
+let questions = [];
+let accessCode = '';
 let deckId = '';
-
-// Get access code from URL
-const urlParams = new URLSearchParams(window.location.search);
-const accessCode = urlParams.get('code');
-
-// Initialize swipe detection
-let touchStartX = 0;
-let touchEndX = 0;
+let locationId = '';
+let eventId = '';
 
 // Initialize the page
 async function init() {
-    if (!accessCode) {
-        showError('No access code provided. Please scan the QR code again.');
-        return;
-    }
-
     try {
-        showLoading(true);
+        // Get access code from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        accessCode = urlParams.get('code');
         
-        // Fetch the deck using the access code
-        const response = await fetch(`/api/decks/${accessCode}`);
-        
-        if (!response.ok) {
-            throw new Error('Failed to load questions');
-        }
-        
-        const deck = await response.json();
-        
-        // Store deck info
-        currentQuestions = deck.questions;
-        eventId = deck.eventId;
-        locationId = deck.locationId;
-        deckId = deck.id;
-        
-        if (currentQuestions.length === 0) {
-            showNoQuestions();
+        if (!accessCode) {
+            showMessage('No access code provided. Please scan the QR code again.', 'error');
             return;
         }
         
-        // Show the first question
-        showQuestion(0);
+        // Load questions
+        await loadQuestions();
         
-        // Setup swipe listeners
-        setupSwipeListeners();
+        // Setup swipe functionality
+        setupSwipe();
         
+        // Setup button listeners
+        setupButtons();
     } catch (error) {
-        console.error('Error:', error);
-        showError('Failed to load questions. Please try again later.');
-    } finally {
-        showLoading(false);
+        console.error('Error initializing page:', error);
+        showMessage('Error loading questions. Please try again.', 'error');
     }
 }
 
-// Setup swipe detection
-function setupSwipeListeners() {
-    const questionCard = document.querySelector('.question-card');
+// Load questions using the access code
+async function loadQuestions() {
+    try {
+        const response = await fetch(`/api/decks/${accessCode}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.msg || 'Failed to load questions');
+        }
+        
+        questions = data.questions || [];
+        deckId = data.id;
+        locationId = data.locationId;
+        eventId = data.eventId;
+        
+        if (questions.length === 0) {
+            showMessage('No questions available for this event.', 'error');
+            return;
+        }
+        
+        // Display first question
+        displayQuestion(0);
+        
+        // Update progress
+        updateProgress();
+    } catch (error) {
+        console.error('Error loading questions:', error);
+        showMessage('Error loading questions. Please try again.', 'error');
+    }
+}
+
+// Display a question
+function displayQuestion(index) {
+    if (index >= questions.length) {
+        // All questions answered
+        showCompletion();
+        return;
+    }
     
+    const question = questions[index];
+    const questionElement = document.getElementById('question-text');
+    const categoryElement = document.getElementById('question-category');
+    
+    if (questionElement) {
+        questionElement.textContent = question.text;
+    }
+    
+    if (categoryElement) {
+        categoryElement.textContent = question.category || '';
+    }
+    
+    // Update current index
+    currentQuestionIndex = index;
+    
+    // Update progress
+    updateProgress();
+}
+
+// Setup swipe functionality
+function setupSwipe() {
+    const questionCard = document.getElementById('question-card');
     if (!questionCard) return;
     
-    // Touch events for mobile
-    questionCard.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
+    let startX, startY, moveX, moveY;
+    let threshold = 100; // Minimum distance to be considered a swipe
+    
+    questionCard.addEventListener('touchstart', function(e) {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
     });
     
-    questionCard.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-    });
-    
-    // Mouse events for desktop (for testing)
-    let isDragging = false;
-    let startX = 0;
-    
-    questionCard.addEventListener('mousedown', e => {
-        isDragging = true;
-        startX = e.clientX;
-        questionCard.style.cursor = 'grabbing';
-    });
-    
-    questionCard.addEventListener('mousemove', e => {
-        if (!isDragging) return;
+    questionCard.addEventListener('touchmove', function(e) {
+        if (!startX || !startY) return;
         
-        const currentX = e.clientX;
-        const diff = currentX - startX;
+        moveX = e.touches[0].clientX;
+        moveY = e.touches[0].clientY;
         
-        // Limit the drag distance
-        if (Math.abs(diff) > 150) return;
+        const diffX = moveX - startX;
         
-        // Move the card
-        questionCard.style.transform = `translateX(${diff}px) rotate(${diff * 0.1}deg)`;
+        // Apply rotation and movement based on swipe
+        questionCard.style.transform = `translateX(${diffX}px) rotate(${diffX * 0.1}deg)`;
         
-        // Change opacity based on direction
-        if (diff > 0) {
-            // Swiping right (like)
-            questionCard.style.backgroundColor = 'rgba(76, 175, 80, 0.1)';
-            questionCard.style.borderColor = '#4CAF50';
-        } else if (diff < 0) {
-            // Swiping left (dislike)
-            questionCard.style.backgroundColor = 'rgba(244, 67, 54, 0.1)';
-            questionCard.style.borderColor = '#F44336';
+        // Change background color based on swipe direction
+        if (diffX > 0) {
+            questionCard.style.backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Green for like
+        } else if (diffX < 0) {
+            questionCard.style.backgroundColor = 'rgba(244, 67, 54, 0.1)'; // Red for dislike
         } else {
-            // Reset
             questionCard.style.backgroundColor = 'white';
-            questionCard.style.borderColor = '#ddd';
         }
     });
     
-    questionCard.addEventListener('mouseup', e => {
-        if (!isDragging) return;
+    questionCard.addEventListener('touchend', function(e) {
+        if (!startX || !startY || !moveX || !moveY) {
+            resetCardPosition();
+            return;
+        }
         
-        const endX = e.clientX;
-        const diff = endX - startX;
+        const diffX = moveX - startX;
         
-        // Reset styles
-        questionCard.style.cursor = 'grab';
-        questionCard.style.backgroundColor = 'white';
-        questionCard.style.borderColor = '#ddd';
-        
-        // If dragged far enough, count as swipe
-        if (Math.abs(diff) > 100) {
-            if (diff > 0) {
-                handleLike();
+        if (Math.abs(diffX) > threshold) {
+            // Swipe was long enough
+            if (diffX > 0) {
+                // Swipe right (like)
+                handleFeedback(true);
             } else {
-                handleDislike();
+                // Swipe left (dislike)
+                handleFeedback(false);
             }
         } else {
-            // Reset position
-            questionCard.style.transform = 'translateX(0) rotate(0)';
+            // Swipe was too short, reset position
+            resetCardPosition();
         }
         
-        isDragging = false;
+        // Reset values
+        startX = null;
+        startY = null;
+        moveX = null;
+        moveY = null;
     });
     
-    questionCard.addEventListener('mouseleave', e => {
-        if (isDragging) {
-            // Reset position and styles
-            questionCard.style.transform = 'translateX(0) rotate(0)';
-            questionCard.style.cursor = 'grab';
+    // For desktop/mouse users
+    let isDragging = false;
+    
+    questionCard.addEventListener('mousedown', function(e) {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+    });
+    
+    document.addEventListener('mousemove', function(e) {
+        if (!isDragging || !startX || !startY) return;
+        
+        moveX = e.clientX;
+        moveY = e.clientY;
+        
+        const diffX = moveX - startX;
+        
+        // Apply rotation and movement based on swipe
+        questionCard.style.transform = `translateX(${diffX}px) rotate(${diffX * 0.1}deg)`;
+        
+        // Change background color based on swipe direction
+        if (diffX > 0) {
+            questionCard.style.backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Green for like
+        } else if (diffX < 0) {
+            questionCard.style.backgroundColor = 'rgba(244, 67, 54, 0.1)'; // Red for dislike
+        } else {
             questionCard.style.backgroundColor = 'white';
-            questionCard.style.borderColor = '#ddd';
-            isDragging = false;
         }
     });
     
-    // Add button listeners
-    document.getElementById('like-button').addEventListener('click', handleLike);
-    document.getElementById('dislike-button').addEventListener('click', handleDislike);
+    document.addEventListener('mouseup', function(e) {
+        if (!isDragging) return;
+        
+        if (!startX || !startY || !moveX || !moveY) {
+            resetCardPosition();
+            isDragging = false;
+            return;
+        }
+        
+        const diffX = moveX - startX;
+        
+        if (Math.abs(diffX) > threshold) {
+            // Swipe was long enough
+            if (diffX > 0) {
+                // Swipe right (like)
+                handleFeedback(true);
+            } else {
+                // Swipe left (dislike)
+                handleFeedback(false);
+            }
+        } else {
+            // Swipe was too short, reset position
+            resetCardPosition();
+        }
+        
+        // Reset values
+        isDragging = false;
+        startX = null;
+        startY = null;
+        moveX = null;
+        moveY = null;
+    });
 }
 
-// Handle swipe gesture
-function handleSwipe() {
-    const swipeThreshold = 100;
-    const swipeDistance = touchEndX - touchStartX;
+// Reset card position after swipe
+function resetCardPosition() {
+    const questionCard = document.getElementById('question-card');
+    if (!questionCard) return;
     
-    if (swipeDistance > swipeThreshold) {
-        // Swiped right (like)
-        handleLike();
-    } else if (swipeDistance < -swipeThreshold) {
-        // Swiped left (dislike)
-        handleDislike();
+    questionCard.style.transform = 'translateX(0) rotate(0)';
+    questionCard.style.backgroundColor = 'white';
+}
+
+// Setup button listeners
+function setupButtons() {
+    const likeButton = document.getElementById('like-button');
+    const dislikeButton = document.getElementById('dislike-button');
+    
+    if (likeButton) {
+        likeButton.addEventListener('click', function() {
+            handleFeedback(true);
+        });
+    }
+    
+    if (dislikeButton) {
+        dislikeButton.addEventListener('click', function() {
+            handleFeedback(false);
+        });
     }
 }
 
-// Handle like action
-function handleLike() {
-    const questionCard = document.querySelector('.question-card');
-    
-    // Animate card swiping right
-    questionCard.style.transform = 'translateX(1000px) rotate(30deg)';
-    questionCard.style.opacity = '0';
-    
-    // Record feedback
-    recordFeedback('like');
-    
-    // Move to next question after animation
-    setTimeout(() => {
-        moveToNextQuestion();
-    }, 300);
-}
-
-// Handle dislike action
-function handleDislike() {
-    const questionCard = document.querySelector('.question-card');
-    
-    // Animate card swiping left
-    questionCard.style.transform = 'translateX(-1000px) rotate(-30deg)';
-    questionCard.style.opacity = '0';
-    
-    // Record feedback
-    recordFeedback('dislike');
-    
-    // Move to next question after animation
-    setTimeout(() => {
-        moveToNextQuestion();
-    }, 300);
-}
-
-// Record feedback for the current question
-async function recordFeedback(feedbackType) {
+// Handle feedback (like/dislike)
+async function handleFeedback(isLike) {
     try {
-        const currentQuestion = currentQuestions[currentQuestionIndex];
+        const question = questions[currentQuestionIndex];
         
-        await fetch('/api/feedback', {
+        // Record feedback
+        await recordFeedback(question.id, isLike);
+        
+        // Animate card off screen
+        const questionCard = document.getElementById('question-card');
+        if (questionCard) {
+            questionCard.style.transform = `translateX(${isLike ? 1000 : -1000}px) rotate(${isLike ? 45 : -45}deg)`;
+            
+            // Wait for animation to complete
+            setTimeout(() => {
+                // Move to next question
+                displayQuestion(currentQuestionIndex + 1);
+                
+                // Reset card position
+                resetCardPosition();
+            }, 300);
+        } else {
+            // No card element, just move to next question
+            displayQuestion(currentQuestionIndex + 1);
+        }
+    } catch (error) {
+        console.error('Error handling feedback:', error);
+        showMessage('Error saving your response. Please try again.', 'error');
+    }
+}
+
+// Record feedback to server
+async function recordFeedback(questionId, isLike) {
+    try {
+        const response = await fetch('/api/feedback', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                questionId: currentQuestion.id,
-                eventId: eventId,
-                locationId: locationId,
-                feedback: feedbackType
+                questionId,
+                eventId,
+                locationId,
+                feedback: isLike ? 'like' : 'dislike'
             })
         });
         
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.msg || 'Failed to record feedback');
+        }
+        
+        return data;
     } catch (error) {
         console.error('Error recording feedback:', error);
-        // Continue anyway - don't block the user experience
+        // Continue anyway to not block the user experience
     }
 }
 
-// Move to the next question
-function moveToNextQuestion() {
-    currentQuestionIndex++;
+// Update progress indicator
+function updateProgress() {
+    const progressElement = document.getElementById('progress');
+    if (!progressElement) return;
     
-    if (currentQuestionIndex < currentQuestions.length) {
-        showQuestion(currentQuestionIndex);
-    } else {
-        showCompletion();
+    const progress = Math.round((currentQuestionIndex / questions.length) * 100);
+    progressElement.style.width = `${progress}%`;
+    
+    const progressText = document.getElementById('progress-text');
+    if (progressText) {
+        progressText.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
     }
-}
-
-// Show the current question
-function showQuestion(index) {
-    const question = currentQuestions[index];
-    
-    // Update progress counter
-    progressCounter.textContent = `${index + 1} / ${currentQuestions.length}`;
-    
-    // Update category label
-    categoryLabel.textContent = question.category || '';
-    
-    // Create question card
-    const questionCard = document.createElement('div');
-    questionCard.className = 'question-card';
-    questionCard.innerHTML = `
-        <div class="question-text">${question.text}</div>
-        <div class="swipe-instruction">
-            <div class="swipe-left">← Swipe left to dislike</div>
-            <div class="swipe-right">Swipe right to like →</div>
-        </div>
-        <div class="button-container">
-            <button id="dislike-button" class="action-button dislike">
-                <i class="fas fa-times"></i>
-            </button>
-            <button id="like-button" class="action-button like">
-                <i class="fas fa-heart"></i>
-            </button>
-        </div>
-    `;
-    
-    // Clear previous question
-    questionContainer.innerHTML = '';
-    
-    // Add new question
-    questionContainer.appendChild(questionCard);
-    
-    // Show the container
-    questionContainer.style.display = 'block';
-    
-    // Setup swipe listeners for the new card
-    setupSwipeListeners();
 }
 
 // Show completion message
 function showCompletion() {
-    questionContainer.style.display = 'none';
-    progressCounter.style.display = 'none';
-    categoryLabel.style.display = 'none';
-    completionMessage.style.display = 'block';
+    const questionContainer = document.getElementById('question-container');
+    const completionContainer = document.getElementById('completion-container');
+    
+    if (questionContainer) {
+        questionContainer.style.display = 'none';
+    }
+    
+    if (completionContainer) {
+        completionContainer.style.display = 'block';
+    }
 }
 
-// Show no questions message
-function showNoQuestions() {
-    questionContainer.style.display = 'none';
-    progressCounter.style.display = 'none';
-    categoryLabel.style.display = 'none';
-    noQuestionsMessage.style.display = 'block';
+// Show message to user
+function showMessage(message, type = 'error') {
+    const messageContainer = document.getElementById('message-container');
+    if (!messageContainer) return;
+    
+    messageContainer.textContent = message;
+    messageContainer.className = `message ${type}`;
+    messageContainer.style.display = 'block';
+    
+    // Hide after 5 seconds
+    setTimeout(() => {
+        messageContainer.style.display = 'none';
+    }, 5000);
 }
-
-// Show error message
-function showError(message) {
-    noQuestionsMessage.textContent = message;
-    showNoQuestions();
-}
-
-// Show/hide loading spinner
-function showLoading(show) {
-    loadingSpinner.style.display = show ? 'block' : 'none';
-}
-
-// Initialize the page when DOM is loaded
-document.addEventListener('DOMContentLoaded', init);
