@@ -28,7 +28,8 @@ function setupLoginForm() {
         const password = document.getElementById('password').value;
         
         try {
-            const data = await apiRequest('/auth/login', 'POST', { email, password });
+            // Updated endpoint to match server.js
+            const data = await apiRequest('/api/auth', 'POST', { email, password });
             
             // Save token to localStorage
             localStorage.setItem('token', data.token);
@@ -65,7 +66,8 @@ function setupRegisterForm() {
         }
         
         try {
-            const data = await apiRequest('/auth/register', 'POST', { name, email, password });
+            // Updated endpoint to match server.js
+            const data = await apiRequest('/api/users', 'POST', { name, email, password });
             
             // Save token to localStorage
             localStorage.setItem('token', data.token);
@@ -81,4 +83,3 @@ function setupRegisterForm() {
             showAlert(error.message || 'Registration failed. Please try again.');
         }
     });
-}
