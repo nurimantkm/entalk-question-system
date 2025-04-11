@@ -1,74 +1,51 @@
-// API utility functions
-const API_URL = 'http://localhost:5000/api';
-
-// Function to show alerts
-function showAlert(message, type = 'danger') {
-    const alertContainer = document.getElementById('alert-container');
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    `;
-    alertContainer.appendChild(alertDiv);
-    
-    // Auto dismiss after 5 seconds
-    setTimeout(() => {
-        alertDiv.classList.remove('show');
-        setTimeout(() => alertDiv.remove(), 300);
-    }, 5000);
-}
-
-// Function to make API requests
-async function apiRequest(endpoint, method = 'GET', data = null) {
-    const token = localStorage.getItem('token');
-    const headers = {
-        'Content-Type': 'application/json'
-    };
-    
-    if (token) {
-        headers['x-auth-token'] = token;
-    }
-    
-    const config = {
-        method,
-        headers
-    };
-    
-    if (data) {
-        config.body = JSON.stringify(data);
-    }
-    
+// API request helper function
+async function apiRequest(endpoint, method, data) {
     try {
-        const response = await fetch(`${API_URL}${endpoint}`, config);
+        const response = await fetch(`/api${endpoint}`, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': localStorage.getItem('token')
+            },
+            body: data ? JSON.stringify(data) : undefined
+        });
+        
         const responseData = await response.json();
         
         if (!response.ok) {
-            throw new Error(responseData.msg || 'Something went wrong');
+            throw new Error(responseData.msg || 'Request failed');
         }
         
         return responseData;
     } catch (error) {
-        console.error('API Error:', error);
+        console.error('API request error:', error);
         throw error;
     }
 }
 
-// Check if user is authenticated
-function isAuthenticated() {
-    return localStorage.getItem('token') !== null;
+// Show alert function if not defined elsewhere
+function showAlert(message, type = 'danger') {
+    const alertContainer = document.getElementById('alert-container');
+    if (!alertContainer) return;
+    
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.textContent = message;
+    alert.style.display = 'block';
+    
+    alertContainer.innerHTML = '';
+    alertContainer.appendChild(alert);
+    
+    // Remove alert after 3 seconds
+    setTimeout(() => {
+        alert.remove();
+    }, 3000);
 }
 
-// Redirect if not authenticated
-function requireAuth() {
-    if (!isAuthenticated()) {
-        window.location.href = '/login.html';
-    }
-}
-
-// Redirect if already authenticated
+// Redirect if authenticated function if not defined elsewhere
 function redirectIfAuthenticated() {
-    if (isAuthenticated()) {
+    const token = localStorage.getItem('token');
+    if (token) {
         window.location.href = '/events.html';
     }
 }
