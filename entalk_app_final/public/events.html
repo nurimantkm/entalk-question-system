@@ -93,6 +93,27 @@
         #questions-section, #deck-section {
             display: none;
         }
+        /* Feedback table styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
     </style>
 </head>
 <body>
@@ -187,21 +208,21 @@
             <div id="deck-info"></div>
             <div id="qr-container"></div>
         </div>
+        
+        <div class="section">
+            <h2>Question Feedback</h2>
+            <div class="form-group">
+                <label for="feedback-event-select">Select Event</label>
+                <select id="feedback-event-select"></select>
+                <button id="load-feedback-btn">Load Feedback</button>
+            </div>
+            <div id="feedback-container">
+                <p>Select an event and click "Load Feedback" to view question feedback.</p>
+            </div>
+        </div>
     </div>
     
     <script src="/js/app.js"></script>
     <script src="/js/events.js"></script>
 </body>
 </html>
-<!-- Add this to your events.html file -->
-<div class="section">
-  <h2>Question Feedback</h2>
-  <div class="form-group">
-    <label for="feedback-event-select">Select Event</label>
-    <select id="feedback-event-select"></select>
-    <button id="load-feedback-btn">Load Feedback</button>
-  </div>
-  <div id="feedback-container">
-    <p>Select an event and click "Load Feedback" to view question feedback.</p>
-  </div>
-</div>
