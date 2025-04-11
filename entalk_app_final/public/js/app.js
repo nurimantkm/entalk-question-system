@@ -1,36 +1,38 @@
-// App-wide functionality
+// app.js - Common functionality across pages
 document.addEventListener('DOMContentLoaded', function() {
-    // Setup logout functionality
-    const logoutLink = document.getElementById('logout-link');
-    if (logoutLink) {
-        logoutLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            localStorage.removeItem('token');
-            window.location.href = '/';
-        });
-    }
-    
     // Update navigation based on authentication status
     updateNavigation();
 });
 
-// Update navigation links based on authentication status
+// Check if user is authenticated
+function isAuthenticated() {
+    return localStorage.getItem('token') !== null;
+}
+
+// Update navigation based on authentication status
 function updateNavigation() {
-    const isLoggedIn = isAuthenticated();
+    const navLoginLink = document.getElementById('nav-login');
+    const navRegisterLink = document.getElementById('nav-register');
+    const navLogoutLink = document.getElementById('nav-logout');
+    const navEventsLink = document.getElementById('nav-events');
     
-    const navLogin = document.getElementById('nav-login');
-    const navRegister = document.getElementById('nav-register');
-    const navLogout = document.getElementById('nav-logout');
-    
-    if (navLogin && navRegister && navLogout) {
-        if (isLoggedIn) {
-            navLogin.classList.add('d-none');
-            navRegister.classList.add('d-none');
-            navLogout.classList.remove('d-none');
-        } else {
-            navLogin.classList.remove('d-none');
-            navRegister.classList.remove('d-none');
-            navLogout.classList.add('d-none');
-        }
+    if (isAuthenticated()) {
+        // User is logged in
+        if (navLoginLink) navLoginLink.style.display = 'none';
+        if (navRegisterLink) navRegisterLink.style.display = 'none';
+        if (navLogoutLink) navLogoutLink.style.display = 'block';
+        if (navEventsLink) navEventsLink.style.display = 'block';
+    } else {
+        // User is logged out
+        if (navLoginLink) navLoginLink.style.display = 'block';
+        if (navRegisterLink) navRegisterLink.style.display = 'block';
+        if (navLogoutLink) navLogoutLink.style.display = 'none';
+        if (navEventsLink) navEventsLink.style.display = 'none';
     }
+}
+
+// Logout function
+function logout() {
+    localStorage.removeItem('token');
+    window.location.href = '/login.html';
 }
