@@ -72,30 +72,33 @@ async function loadQuestions() {
 }
 
 // Display a question
+// Add this to your displayQuestion function
 function displayQuestion(index) {
-    if (index >= questions.length) {
-        // All questions answered
-        showCompletion();
-        return;
-    }
-    
-    const question = questions[index];
-    const questionElement = document.getElementById('question-text');
-    const categoryElement = document.getElementById('question-category');
-    
-    if (questionElement) {
-        questionElement.textContent = question.text;
-    }
-    
-    if (categoryElement) {
-        categoryElement.textContent = question.category || '';
-    }
-    
-    // Update current index
-    currentQuestionIndex = index;
-    
-    // Update progress
-    updateProgress();
+  if (index >= questions.length) {
+    // All questions answered
+    showCompletion();
+    return;
+  }
+  
+  const question = questions[index];
+  console.log("Displaying question:", question); // Add this line for debugging
+  
+  const questionElement = document.getElementById('question-text');
+  const categoryElement = document.getElementById('question-category');
+  
+  if (questionElement) {
+    questionElement.textContent = question.text || "AI generated question";
+  }
+  
+  if (categoryElement) {
+    categoryElement.textContent = question.category || '';
+  }
+  
+  // Update current index
+  currentQuestionIndex = index;
+  
+  // Update progress
+  updateProgress();
 }
 
 // Setup swipe functionality
