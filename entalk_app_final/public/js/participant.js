@@ -43,6 +43,7 @@ async function init() {
 // Load questions using the access code
 async function loadQuestions() {
     try {
+        console.log("Loading questions with access code:", accessCode);
         const response = await fetch(`/api/decks/${accessCode}`);
         const data = await response.json();
         
@@ -50,6 +51,7 @@ async function loadQuestions() {
             throw new Error(data.msg || 'Failed to load questions');
         }
         
+        console.log("Received data:", data);
         questions = data.questions || [];
         deckId = data.id;
         locationId = data.locationId;
@@ -72,39 +74,46 @@ async function loadQuestions() {
 }
 
 // Display a question
-// Add this to your displayQuestion function
 function displayQuestion(index) {
-  if (index >= questions.length) {
-    // All questions answered
-    showCompletion();
-    return;
-  }
-  
-  const question = questions[index];
-  console.log("Displaying question:", question); // Add this line for debugging
-  
-  const questionElement = document.getElementById('question-text');
-  const categoryElement = document.getElementById('question-category');
-  
-  if (questionElement) {
-    questionElement.textContent = question.text || "AI generated question";
-  }
-  
-  if (categoryElement) {
-    categoryElement.textContent = question.category || '';
-  }
-  
-  // Update current index
-  currentQuestionIndex = index;
-  
-  // Update progress
-  updateProgress();
+    if (index >= questions.length) {
+        // All questions answered
+        showCompletion();
+        return;
+    }
+    
+    const question = questions[index];
+    console.log("Displaying question:", question); // Debug log
+    
+    const questionElement = document.getElementById('question-text');
+    const categoryElement = document.getElementById('question-category');
+    
+    if (questionElement) {
+        // Make sure we have text to display
+        questionElement.textContent = question.text || "AI generated question";
+    } else {
+        console.error("Question text element not found");
+    }
+    
+    if (categoryElement) {
+        categoryElement.textContent = question.category || '';
+    } else {
+        console.error("Category element not found");
+    }
+    
+    // Update current index
+    currentQuestionIndex = index;
+    
+    // Update progress
+    updateProgress();
 }
 
 // Setup swipe functionality
 function setupSwipe() {
     const questionCard = document.getElementById('question-card');
-    if (!questionCard) return;
+    if (!questionCard) {
+        console.error("Question card element not found");
+        return;
+    }
     
     let startX, startY, moveX, moveY;
     let threshold = 100; // Minimum distance to be considered a swipe
@@ -246,19 +255,29 @@ function setupButtons() {
         likeButton.addEventListener('click', function() {
             handleFeedback(true);
         });
+    } else {
+        console.error("Like button not found");
     }
     
     if (dislikeButton) {
         dislikeButton.addEventListener('click', function() {
             handleFeedback(false);
         });
+    } else {
+        console.error("Dislike button not found");
     }
 }
 
 // Handle feedback (like/dislike)
 async function handleFeedback(isLike) {
     try {
+        if (currentQuestionIndex >= questions.length) {
+            console.error("Invalid question index:", currentQuestionIndex);
+            return;
+        }
+        
         const question = questions[currentQuestionIndex];
+        console.log("Recording feedback for question:", question, "isLike:", isLike);
         
         // Record feedback
         await recordFeedback(question.id, isLike);
@@ -289,6 +308,13 @@ async function handleFeedback(isLike) {
 // Record feedback to server
 async function recordFeedback(questionId, isLike) {
     try {
+        console.log("Sending feedback to server:", {
+            questionId,
+            eventId,
+            locationId,
+            feedback: isLike ? 'like' : 'dislike'
+        });
+        
         const response = await fetch('/api/feedback', {
             method: 'POST',
             headers: {
@@ -308,6 +334,7 @@ async function recordFeedback(questionId, isLike) {
             throw new Error(data.msg || 'Failed to record feedback');
         }
         
+        console.log("Feedback recorded successfully:", data);
         return data;
     } catch (error) {
         console.error('Error recording feedback:', error);
@@ -318,7 +345,10 @@ async function recordFeedback(questionId, isLike) {
 // Update progress indicator
 function updateProgress() {
     const progressElement = document.getElementById('progress');
-    if (!progressElement) return;
+    if (!progressElement) {
+        console.error("Progress element not found");
+        return;
+    }
     
     const progress = Math.round((currentQuestionIndex / questions.length) * 100);
     progressElement.style.width = `${progress}%`;
@@ -326,6 +356,8 @@ function updateProgress() {
     const progressText = document.getElementById('progress-text');
     if (progressText) {
         progressText.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+    } else {
+        console.error("Progress text element not found");
     }
 }
 
@@ -336,17 +368,24 @@ function showCompletion() {
     
     if (questionContainer) {
         questionContainer.style.display = 'none';
+    } else {
+        console.error("Question container not found");
     }
     
     if (completionContainer) {
         completionContainer.style.display = 'block';
+    } else {
+        console.error("Completion container not found");
     }
 }
 
 // Show message to user
 function showMessage(message, type = 'error') {
     const messageContainer = document.getElementById('message-container');
-    if (!messageContainer) return;
+    if (!messageContainer) {
+        console.error("Message container not found");
+        return;
+    }
     
     messageContainer.textContent = message;
     messageContainer.className = `message ${type}`;
