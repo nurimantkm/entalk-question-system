@@ -1,3 +1,6 @@
+// Updated openaiService.js for compatibility with OpenAI v3.2.1
+
+// Import the OpenAI library correctly for v3.2.1
 const { Configuration, OpenAIApi } = require('openai');
 
 // Initialize OpenAI client
