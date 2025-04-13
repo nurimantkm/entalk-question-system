@@ -1,6 +1,3 @@
-// Updated openaiService.js for compatibility with installed OpenAI package
-
-// Import the OpenAI library - using CommonJS require syntax
 const { Configuration, OpenAIApi } = require('openai');
 
 // Initialize OpenAI client
@@ -9,10 +6,10 @@ let openaiClient = null;
 // Initialize OpenAI with API key
 function initializeOpenAI(apiKey) {
   try {
-    // Create a new instance of the OpenAI class
-    openaiClient = new OpenAI.OpenAI({
-      apiKey: apiKey
+    const configuration = new Configuration({
+      apiKey: apiKey,
     });
+    openaiClient = new OpenAIApi(configuration);
     console.log('OpenAI client initialized successfully');
     return openaiClient;
   } catch (error) {
@@ -42,44 +39,19 @@ Deck Phase: ${deckPhase} (${phaseDescription})
 Make the questions creative, thought-provoking, and suitable for adult English learners.
 Return only the questions as a JSON array of strings.`;
 
-    // Use the correct method based on the installed OpenAI version
-    let response;
-    try {
-      // Try the newer API format first
-      response = await openaiClient.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: "You are a helpful assistant that generates engaging conversation questions." },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.8,
-        max_tokens: 1000
-      });
-    } catch (e) {
-      // Fall back to older API format if needed
-      response = await openaiClient.createChatCompletion({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: "You are a helpful assistant that generates engaging conversation questions." },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.8,
-        max_tokens: 1000
-      });
-    }
+    // Use the correct method for OpenAI v3.2.1
+    const response = await openaiClient.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "You are a helpful assistant that generates engaging conversation questions." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.8,
+      max_tokens: 1000
+    });
 
     // Parse the response to extract questions
-    let content;
-    if (response.choices && response.choices[0].message) {
-      // New API format
-      content = response.choices[0].message.content;
-    } else if (response.data && response.data.choices && response.data.choices[0].message) {
-      // Old API format
-      content = response.data.choices[0].message.content;
-    } else {
-      throw new Error('Unexpected response format from OpenAI API');
-    }
-    
+    const content = response.data.choices[0].message.content;
     console.log('OpenAI response received:', content.substring(0, 100) + '...');
     
     let questions = [];
@@ -154,44 +126,19 @@ async function generateNoveltyQuestions(count) {
 These should be unique, unexpected questions that make people think differently.
 Return only the questions as a JSON array of strings.`;
 
-    // Use the correct method based on the installed OpenAI version
-    let response;
-    try {
-      // Try the newer API format first
-      response = await openaiClient.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: "You are a creative assistant that generates unusual and thought-provoking conversation questions." },
-          { role: "user", content: prompt }
-        ],
-        temperature: 1.0,
-        max_tokens: 1000
-      });
-    } catch (e) {
-      // Fall back to older API format if needed
-      response = await openaiClient.createChatCompletion({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: "You are a creative assistant that generates unusual and thought-provoking conversation questions." },
-          { role: "user", content: prompt }
-        ],
-        temperature: 1.0,
-        max_tokens: 1000
-      });
-    }
+    // Use the correct method for OpenAI v3.2.1
+    const response = await openaiClient.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "You are a creative assistant that generates unusual and thought-provoking conversation questions." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 1.0,
+      max_tokens: 1000
+    });
 
     // Parse the response to extract questions
-    let content;
-    if (response.choices && response.choices[0].message) {
-      // New API format
-      content = response.choices[0].message.content;
-    } else if (response.data && response.data.choices && response.data.choices[0].message) {
-      // Old API format
-      content = response.data.choices[0].message.content;
-    } else {
-      throw new Error('Unexpected response format from OpenAI API');
-    }
-    
+    const content = response.data.choices[0].message.content;
     console.log('OpenAI response received for novelty questions');
     
     let questions = [];
@@ -298,43 +245,19 @@ Category: ${category} (${categoryDescription})
 Make the questions creative, thought-provoking, and suitable for adult English learners.
 Return only the questions as a JSON array of strings.`;
 
-      // Use the correct method based on the installed OpenAI version
-      let response;
-      try {
-        // Try the newer API format first
-        response = await openaiClient.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: "You are a helpful assistant that generates engaging conversation questions." },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.8,
-          max_tokens: 500
-        });
-      } catch (e) {
-        // Fall back to older API format if needed
-        response = await openaiClient.createChatCompletion({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: "You are a helpful assistant that generates engaging conversation questions." },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.8,
-          max_tokens: 500
-        });
-      }
+      // Use the correct method for OpenAI v3.2.1
+      const response = await openaiClient.createChatCompletion({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: "You are a helpful assistant that generates engaging conversation questions." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.8,
+        max_tokens: 500
+      });
 
       // Parse the response to extract questions
-      let content;
-      if (response.choices && response.choices[0].message) {
-        // New API format
-        content = response.choices[0].message.content;
-      } else if (response.data && response.data.choices && response.data.choices[0].message) {
-        // Old API format
-        content = response.data.choices[0].message.content;
-      } else {
-        throw new Error('Unexpected response format from OpenAI API');
-      }
+      const content = response.data.choices[0].message.content;
       
       let questions = [];
 
