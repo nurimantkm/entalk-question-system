@@ -1,7 +1,7 @@
 // Updated openaiService.js for compatibility with installed OpenAI package
 
 // Import the OpenAI library - using CommonJS require syntax
-const OpenAI = require('openai');
+const { Configuration, OpenAIApi } = require('openai');
 
 // Initialize OpenAI client
 let openaiClient = null;
