@@ -1,4 +1,4 @@
-// Updated server.js with improved OpenAI integration and error handling
+// Updated server.js with MongoDB integration and improved error handling
 
 const express = require('express');
 const cors = require('cors');
@@ -6,6 +6,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose'); // Add mongoose for MongoDB
 
 // Load environment variables
 dotenv.config();
@@ -28,6 +29,33 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Initialize global data structures if they don't exist
+global.users = global.users || [];
+global.events = global.events || [];
+global.questions = global.questions || [];
+global.locations = global.locations || [];
+global.decks = global.decks || [];
+global.feedback = global.feedback || [];
+
+// Connect to MongoDB
+let mongoConnected = false;
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log('MongoDB connected successfully');
+    mongoConnected = true;
+  })
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    console.log('Falling back to in-memory data storage');
+  });
+} else {
+  console.log('No MongoDB URI provided, using in-memory data storage');
+}
+
 // Initialize OpenAI service if API key is available
 let openaiInitialized = false;
 try {
@@ -48,49 +76,62 @@ questionService.initializeLocations();
 
 // Create test data if in development mode
 if (process.env.NODE_ENV === 'development') {
-  // Create test user
-  const testUser = new User('Admin', 'admin@entalk.com', 'Entalk123!');
-  console.log('Test user created:', testUser.email);
+  // Create test user if none exists
+  if (global.users.length === 0) {
+    // Hash the password
+    const salt = bcrypt.genSaltSync(10);
+    const hashedPassword = bcrypt.hashSync('Entalk123!', salt);
+    
+    const testUser = new User('Admin', 'admin@entalk.com', hashedPassword);
+    global.users.push(testUser);
+    console.log('Test user created:', testUser.email);
+  }
   
-  // Create test event
-  const testEvent = new Event('Sample Event', 'A sample event for testing', new Date(), 'loc1');
-  console.log('Test event created:', testEvent.name);
+  // Create test event if none exists
+  if (global.events.length === 0) {
+    const testEvent = new Event('Sample Event', 'A sample event for testing', new Date(), 'loc1');
+    global.events.push(testEvent);
+    console.log('Test event created:', testEvent.name);
+  }
   
-  // Create sample questions
-  const sampleQuestions = [
-    {
-      text: 'What is your favorite hobby and why?',
-      category: 'Personal',
-      deckPhase: 'Warm-Up',
-      isNovelty: false
-    },
-    {
-      text: 'If you could travel anywhere in the world, where would you go?',
-      category: 'Hypothetical',
-      deckPhase: 'Personal',
-      isNovelty: false
-    },
-    {
-      text: 'What is the most interesting book you have read recently?',
-      category: 'Opinion',
-      deckPhase: 'Reflective',
-      isNovelty: false
-    }
-  ];
-  
-  questionService.createQuestions(sampleQuestions, testEvent.id);
-  console.log('Sample questions created');
-  
-  // Create sample deck
-  (async () => {
-    try {
-      const deck = await questionService.generateQuestionDeck('loc1', testEvent.id);
-      console.log('Sample deck created for location: Üsküdar');
-      console.log('Access code:', deck.accessCode);
-    } catch (error) {
-      console.error('Error creating sample deck:', error);
-    }
-  })();
+  // Create sample questions if none exist
+  if (global.questions.length === 0) {
+    const sampleQuestions = [
+      {
+        text: 'What is your favorite hobby and why?',
+        category: 'Personal',
+        deckPhase: 'Warm-Up',
+        isNovelty: false
+      },
+      {
+        text: 'If you could travel anywhere in the world, where would you go?',
+        category: 'Hypothetical',
+        deckPhase: 'Personal',
+        isNovelty: false
+      },
+      {
+        text: 'What is the most interesting book you have read recently?',
+        category: 'Opinion',
+        deckPhase: 'Reflective',
+        isNovelty: false
+      }
+    ];
+    
+    const eventId = global.events[0].id;
+    questionService.createQuestions(sampleQuestions, eventId);
+    console.log('Sample questions created');
+    
+    // Create sample deck
+    (async () => {
+      try {
+        const deck = await questionService.generateQuestionDeck('loc1', eventId);
+        console.log('Sample deck created for location: Üsküdar');
+        console.log('Access code:', deck.accessCode);
+      } catch (error) {
+        console.error('Error creating sample deck:', error);
+      }
+    })();
+  }
 }
 
 // Authentication middleware
@@ -102,7 +143,7 @@ function auth(req, res, next) {
   }
   
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'entalk_jwt_secret_key_default');
     req.user = decoded;
     next();
   } catch (error) {
@@ -114,138 +155,194 @@ function auth(req, res, next) {
 
 // Auth routes
 app.post('/api/auth', async (req, res) => {
-  const { email, password } = req.body;
-  
-  if (!email || !password) {
-    return res.status(400).json({ msg: 'Please enter all fields' });
-  }
-  
-  // Find user by email
-  const user = global.users.find(u => u.email === email);
-  
-  if (!user) {
-    return res.status(400).json({ msg: 'User does not exist' });
-  }
-  
-  // Validate password
-  const isMatch = await bcrypt.compare(password, user.password);
-  
-  if (!isMatch) {
-    return res.status(400).json({ msg: 'Invalid credentials' });
-  }
-  
-  // Create JWT
-  const token = jwt.sign(
-    { id: user.id },
-    process.env.JWT_SECRET,
-    { expiresIn: 3600 }
-  );
-  
-  res.json({
-    token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ msg: 'Please enter all fields' });
     }
-  });
+    
+    // Find user by email
+    const user = global.users.find(u => u.email === email);
+    
+    if (!user) {
+      return res.status(400).json({ msg: 'User does not exist' });
+    }
+    
+    // Validate password
+    try {
+      const isMatch = await bcrypt.compare(password, user.password);
+      
+      if (!isMatch) {
+        return res.status(400).json({ msg: 'Invalid credentials' });
+      }
+      
+      // Create JWT
+      const token = jwt.sign(
+        { id: user.id },
+        process.env.JWT_SECRET || 'entalk_jwt_secret_key_default',
+        { expiresIn: 3600 }
+      );
+      
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email
+        }
+      });
+    } catch (error) {
+      console.error('Password comparison error:', error);
+      res.status(500).json({ msg: 'Server error during authentication' });
+    }
+  } catch (error) {
+    console.error('Auth error:', error);
+    res.status(500).json({ msg: 'Server error' });
+  }
 });
 
 // User routes
 app.post('/api/users', async (req, res) => {
-  const { name, email, password } = req.body;
-  
-  if (!name || !email || !password) {
-    return res.status(400).json({ msg: 'Please enter all fields' });
-  }
-  
-  // Check if user already exists
-  const existingUser = global.users.find(u => u.email === email);
-  
-  if (existingUser) {
-    return res.status(400).json({ msg: 'User already exists' });
-  }
-  
-  // Create new user
-  const user = new User(name, email, password);
-  
-  // Create JWT
-  const token = jwt.sign(
-    { id: user.id },
-    process.env.JWT_SECRET,
-    { expiresIn: 3600 }
-  );
-  
-  res.json({
-    token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email
+  try {
+    const { name, email, password } = req.body;
+    
+    if (!name || !email || !password) {
+      return res.status(400).json({ msg: 'Please enter all fields' });
     }
-  });
+    
+    // Check if user already exists
+    const existingUser = global.users.find(u => u.email === email);
+    
+    if (existingUser) {
+      return res.status(400).json({ msg: 'User already exists' });
+    }
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // Create new user
+    const user = new User(name, email, hashedPassword);
+    global.users.push(user);
+    
+    // Create JWT
+    const token = jwt.sign(
+      { id: user.id },
+      process.env.JWT_SECRET || 'entalk_jwt_secret_key_default',
+      { expiresIn: 3600 }
+    );
+    
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ msg: 'Server error during registration' });
+  }
 });
 
 // Event routes
 app.get('/api/events', auth, (req, res) => {
-  res.json(global.events);
+  try {
+    res.json(global.events);
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    res.status(500).json({ msg: 'Server error fetching events' });
+  }
 });
 
 app.post('/api/events', auth, (req, res) => {
-  const { name, description, date, locationId } = req.body;
-  
-  if (!name || !description || !date || !locationId) {
-    return res.status(400).json({ msg: 'Please enter all fields' });
+  try {
+    const { name, description, date, locationId } = req.body;
+    
+    if (!name || !description || !date || !locationId) {
+      return res.status(400).json({ msg: 'Please enter all fields' });
+    }
+    
+    const event = new Event(name, description, new Date(date), locationId);
+    global.events.push(event);
+    
+    res.json(event);
+  } catch (error) {
+    console.error('Error creating event:', error);
+    res.status(500).json({ msg: 'Server error creating event' });
   }
-  
-  const event = new Event(name, description, new Date(date), locationId);
-  
-  res.json(event);
 });
 
 // Location routes
 app.get('/api/locations', auth, (req, res) => {
-  res.json(global.locations);
+  try {
+    res.json(global.locations);
+  } catch (error) {
+    console.error('Error fetching locations:', error);
+    res.status(500).json({ msg: 'Server error fetching locations' });
+  }
 });
 
 // Question routes
 app.get('/api/questions/categories', auth, (req, res) => {
-  res.json(questionService.getQuestionCategories());
+  try {
+    res.json(questionService.getQuestionCategories());
+  } catch (error) {
+    console.error('Error fetching question categories:', error);
+    res.status(500).json({ msg: 'Server error fetching question categories' });
+  }
 });
 
 app.get('/api/questions/phases', auth, (req, res) => {
-  res.json(questionService.getDeckPhases());
+  try {
+    res.json(questionService.getDeckPhases());
+  } catch (error) {
+    console.error('Error fetching deck phases:', error);
+    res.status(500).json({ msg: 'Server error fetching deck phases' });
+  }
 });
 
 app.get('/api/questions/:eventId', auth, (req, res) => {
-  const { eventId } = req.params;
-  
-  const questions = global.questions.filter(q => q.eventId === eventId);
-  
-  res.json(questions);
+  try {
+    const { eventId } = req.params;
+    
+    const questions = global.questions.filter(q => q.eventId === eventId);
+    
+    res.json(questions);
+  } catch (error) {
+    console.error('Error fetching questions:', error);
+    res.status(500).json({ msg: 'Server error fetching questions' });
+  }
 });
 
 app.post('/api/questions', auth, (req, res) => {
-  const { questions, eventId } = req.body;
-  
-  if (!questions || !eventId) {
-    return res.status(400).json({ msg: 'Please provide questions and event ID' });
+  try {
+    const { questions, eventId } = req.body;
+    
+    if (!questions || !eventId) {
+      return res.status(400).json({ msg: 'Please provide questions and event ID' });
+    }
+    
+    const createdQuestions = questionService.createQuestions(questions, eventId);
+    
+    res.json(createdQuestions);
+  } catch (error) {
+    console.error('Error creating questions:', error);
+    res.status(500).json({ msg: 'Server error creating questions' });
   }
-  
-  const createdQuestions = questionService.createQuestions(questions, eventId);
-  
-  res.json(createdQuestions);
 });
 
 // Generate questions with OpenAI
 app.post('/api/questions/generate', auth, async (req, res) => {
-  const { topic, count, category, deckPhase } = req.body;
-  
-  if (!topic || !count || !category || !deckPhase) {
-    return res.status(400).json({ msg: 'Please provide topic, count, category, and deck phase' });
-  }
-  
   try {
+    const { topic, count, category, deckPhase } = req.body;
+    
+    if (!topic || !count || !category || !deckPhase) {
+      return res.status(400).json({ msg: 'Please provide topic, count, category, and deck phase' });
+    }
+    
     let questions;
     
     if (openaiInitialized) {
@@ -273,13 +370,13 @@ app.post('/api/questions/generate', auth, async (req, res) => {
 
 // Generate AI questions
 app.post('/api/questions/generate-ai', auth, async (req, res) => {
-  const { count } = req.body;
-  
-  if (!count) {
-    return res.status(400).json({ msg: 'Please provide count' });
-  }
-  
   try {
+    const { count } = req.body;
+    
+    if (!count) {
+      return res.status(400).json({ msg: 'Please provide count' });
+    }
+    
     let questions;
     
     if (openaiInitialized) {
@@ -310,14 +407,14 @@ app.post('/api/questions/generate-ai', auth, async (req, res) => {
 
 // Deck routes
 app.post('/api/decks/generate/:locationId', auth, async (req, res) => {
-  const { locationId } = req.params;
-  const { eventId } = req.body;
-  
-  if (!locationId || !eventId) {
-    return res.status(400).json({ msg: 'Please provide location ID and event ID' });
-  }
-  
   try {
+    const { locationId } = req.params;
+    const { eventId } = req.body;
+    
+    if (!locationId || !eventId) {
+      return res.status(400).json({ msg: 'Please provide location ID and event ID' });
+    }
+    
     const deck = await questionService.generateQuestionDeck(locationId, eventId);
     
     res.json(deck);
@@ -329,9 +426,9 @@ app.post('/api/decks/generate/:locationId', auth, async (req, res) => {
 
 // Get deck by access code
 app.get('/api/decks/:accessCode', (req, res) => {
-  const { accessCode } = req.params;
-  
   try {
+    const { accessCode } = req.params;
+    
     const deck = questionService.getDeckByAccessCode(accessCode);
     
     res.json(deck);
@@ -343,13 +440,13 @@ app.get('/api/decks/:accessCode', (req, res) => {
 
 // Feedback routes
 app.post('/api/feedback', (req, res) => {
-  const { questionId, eventId, locationId, feedbackType, userId } = req.body;
-  
-  if (!questionId || !eventId || !locationId || !feedbackType) {
-    return res.status(400).json({ msg: 'Please provide all required fields' });
-  }
-  
   try {
+    const { questionId, eventId, locationId, feedbackType, userId } = req.body;
+    
+    if (!questionId || !eventId || !locationId || !feedbackType) {
+      return res.status(400).json({ msg: 'Please provide all required fields' });
+    }
+    
     const feedback = questionService.recordFeedback(
       questionId,
       eventId,
@@ -367,9 +464,9 @@ app.post('/api/feedback', (req, res) => {
 
 // Get feedback stats for a question
 app.get('/api/feedback/stats/:questionId', auth, (req, res) => {
-  const { questionId } = req.params;
-  
   try {
+    const { questionId } = req.params;
+    
     const stats = questionService.getFeedbackStats(questionId);
     
     res.json(stats);
@@ -379,9 +476,27 @@ app.get('/api/feedback/stats/:questionId', auth, (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    mongoConnected,
+    openaiInitialized,
+    usersCount: global.users.length,
+    eventsCount: global.events.length,
+    questionsCount: global.questions.length
+  });
+});
+
 // Serve static files
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ msg: 'Server error', error: err.message });
 });
 
 // Start server
