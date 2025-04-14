@@ -864,3 +864,202 @@ function logout() {
     localStorage.removeItem('token');
     window.location.href = '/login.html';
 }
+// Fix for category and deck phase display issues and question section visibility
+
+// 1. Fix for the questions-section visibility
+document.addEventListener('DOMContentLoaded', function() {
+    // Make questions section visible by default
+    const questionsSection = document.getElementById('questions-section');
+    if (questionsSection) {
+        questionsSection.style.display = 'block';
+    }
+});
+
+// 2. Fix for category and deck phase display in dropdowns
+function populateCategoryDropdown(categories) {
+    const categoryDropdown = document.getElementById('question-category');
+    if (!categoryDropdown) return;
+    
+    // Clear existing options
+    categoryDropdown.innerHTML = '<option value="">-- Select --</option>';
+    
+    // Add categories with proper text display
+    categories.forEach(category => {
+        // Check if category is an object and has a name property
+        const categoryName = category.name || (typeof category === 'string' ? category : JSON.stringify(category));
+        const categoryValue = category.id || category;
+        
+        const option = document.createElement('option');
+        option.value = categoryValue;
+        option.textContent = categoryName;
+        categoryDropdown.appendChild(option);
+    });
+    
+    console.log('Category dropdown populated with proper text values');
+}
+
+function populatePhaseDropdown(phases) {
+    const phaseDropdown = document.getElementById('question-phase');
+    if (!phaseDropdown) return;
+    
+    // Clear existing options
+    phaseDropdown.innerHTML = '<option value="">-- Select --</option>';
+    
+    // Add phases with proper text display
+    phases.forEach(phase => {
+        // Check if phase is an object and has a name property
+        const phaseName = phase.name || (typeof phase === 'string' ? phase : JSON.stringify(phase));
+        const phaseValue = phase.id || phase;
+        
+        const option = document.createElement('option');
+        option.value = phaseValue;
+        option.textContent = phaseName;
+        phaseDropdown.appendChild(option);
+    });
+    
+    console.log('Phase dropdown populated with proper text values');
+}
+
+// 3. Fix for displaying generated questions
+function displayGeneratedQuestions(questions) {
+    const generatedQuestionsDiv = document.getElementById('generated-questions');
+    const saveQuestionsBtn = document.getElementById('save-questions-btn');
+    
+    if (!generatedQuestionsDiv) {
+        console.warn('Generated questions div not found');
+        return;
+    }
+    
+    if (questions.length === 0) {
+        generatedQuestionsDiv.innerHTML = '<p>No questions generated.</p>';
+        if (saveQuestionsBtn) saveQuestionsBtn.style.display = 'none';
+        return;
+    }
+    
+    // Create HTML for questions
+    let html = '<h3>Generated Questions</h3><ul class="question-list">';
+    
+    questions.forEach(question => {
+        // Ensure category and phase are displayed properly
+        const categoryText = typeof question.category === 'object' ? 
+            (question.category.name || JSON.stringify(question.category)) : 
+            question.category;
+            
+        const phaseText = typeof question.deckPhase === 'object' ? 
+            (question.deckPhase.name || JSON.stringify(question.deckPhase)) : 
+            question.deckPhase;
+        
+        html += `
+            <li>
+                <div class="question-text">${question.text}</div>
+                <div class="question-meta">
+                    <span class="category">Category: ${categoryText}</span>
+                    <span class="phase">Phase: ${phaseText}</span>
+                </div>
+            </li>
+        `;
+    });
+    
+    html += '</ul>';
+    
+    // Display questions
+    generatedQuestionsDiv.innerHTML = html;
+    
+    // Add some styling to the questions
+    const style = document.createElement('style');
+    style.textContent = `
+        .question-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .question-list li {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        .question-text {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .question-meta {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Show save button
+    if (saveQuestionsBtn) {
+        saveQuestionsBtn.style.display = 'block';
+    }
+}
+
+// 4. Fix for generating questions
+async function generateQuestions() {
+    const eventId = document.getElementById('event-select').value;
+    const topic = document.getElementById('question-topic').value;
+    const count = document.getElementById('question-count').value;
+    const category = document.getElementById('question-category').value;
+    const deckPhase = document.getElementById('question-phase').value;
+    
+    if (!eventId) {
+        showAlert('Please select an event', 'danger');
+        return;
+    }
+    
+    if (!topic || !count || !category || !deckPhase) {
+        showAlert('Please fill in all fields', 'danger');
+        return;
+    }
+    
+    try {
+        console.log('Generating questions...');
+        showAlert('Generating questions... This may take a moment.', 'info');
+        
+        // Make sure questions section is visible
+        const questionsSection = document.getElementById('questions-section');
+        if (questionsSection) {
+            questionsSection.style.display = 'block';
+        }
+        
+        const response = await fetch('/api/questions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                eventId,
+                topic,
+                count: parseInt(count),
+                category,
+                deckPhase
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.msg || 'Failed to generate questions');
+        }
+        
+        const data = await response.json();
+        
+        // Store the generated questions
+        currentQuestions = data.questions || [];
+        
+        // Display generated questions
+        displayGeneratedQuestions(currentQuestions);
+        
+        // Show success message
+        showAlert('Questions generated successfully', 'success');
+        
+        console.log('Questions generated successfully:', currentQuestions.length);
+    } catch (error) {
+        console.error('Error generating questions:', error);
+        showAlert(`Error generating questions: ${error.message}`, 'danger');
+    }
+}
