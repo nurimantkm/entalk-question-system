@@ -31,7 +31,7 @@ async function init() {
         await loadLocations();
         await loadEvents();
         
-        // Attempt to load categories and phases via API (will fall back to defaults if fails)
+        // Load categories and phases for dropdowns (will fall back to defaults if API fails)
         await loadCategoriesAndPhases();
         
         console.log('Events page initialized successfully');
@@ -71,7 +71,7 @@ function setupEventListeners() {
     }
 }
 
-// Populate default categories and phases
+// Populate default categories and phases using plain string values
 function initializeDefaultCategoriesAndPhases() {
     console.log('Initializing default categories and phases...');
     
@@ -100,7 +100,7 @@ async function loadCategoriesAndPhases() {
     try {
         console.log('Loading categories and phases from API...');
         
-        // Categories
+        // Load categories
         const categoriesResponse = await fetch('/api/categories', {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -118,7 +118,7 @@ async function loadCategoriesAndPhases() {
             console.warn('Failed to load categories from API, using defaults');
         }
         
-        // Phases
+        // Load phases
         const phasesResponse = await fetch('/api/phases', {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -141,7 +141,7 @@ async function loadCategoriesAndPhases() {
     }
 }
 
-// Load locations (using API and fallback defaults)
+// Load locations (using API or fallback defaults)
 async function loadLocations() {
     try {
         console.log('Loading locations...');
@@ -172,11 +172,7 @@ async function loadLocations() {
             ];
             const locationSelects = document.querySelectorAll('#location-select');
             locationSelects.forEach(select => {
-                populateDropdown(
-                    select,
-                    defaultLocations.map(loc => loc.name),
-                    defaultLocations.map(loc => loc.id)
-                );
+                populateDropdown(select, defaultLocations.map(loc => loc.name), defaultLocations.map(loc => loc.id));
             });
         }
     } catch (error) {
@@ -185,7 +181,7 @@ async function loadLocations() {
     }
 }
 
-// Load events
+// Load events from the API
 async function loadEvents() {
     try {
         console.log('Loading events...');
@@ -232,11 +228,7 @@ async function loadEvents() {
         const eventSelects = document.querySelectorAll('#event-select, #feedback-event-select');
         eventSelects.forEach(select => {
             if (select) {
-                populateDropdown(
-                    select,
-                    events.map(e => e.name),
-                    events.map(e => e.id)
-                );
+                populateDropdown(select, events.map(e => e.name), events.map(e => e.id));
             }
         });
         
@@ -245,29 +237,6 @@ async function loadEvents() {
         console.error('Error loading events:', error);
         showAlert('Failed to load events. Please try again later.', 'danger');
     }
-}
-
-// Populate a dropdown with options
-// values is an optional array for the value attributes, if not provided, options themselves are used.
-function populateDropdown(selectElement, options, values = null) {
-    if (!selectElement) {
-        console.warn('Cannot populate dropdown: select element is null');
-        return;
-    }
-    
-    selectElement.innerHTML = '';
-    
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = '-- Select --';
-    selectElement.appendChild(defaultOption);
-    
-    options.forEach((option, index) => {
-        const optionElement = document.createElement('option');
-        optionElement.value = values ? values[index] : option;
-        optionElement.textContent = option;
-        selectElement.appendChild(optionElement);
-    });
 }
 
 // Create a new event
@@ -339,7 +308,6 @@ async function createEvent(e) {
 async function selectEvent(eventId) {
     try {
         console.log('Selecting event:', eventId);
-        
         currentEventId = eventId;
         
         const eventSelects = document.querySelectorAll('#event-select, #feedback-event-select');
@@ -445,8 +413,12 @@ function displayGeneratedQuestions(questions) {
     let html = '<h3>Generated Questions</h3><ul class="question-list">';
     
     questions.forEach(question => {
-        const categoryText = typeof question.category === 'object' ? (question.category.name || JSON.stringify(question.category)) : question.category;
-        const phaseText = typeof question.deckPhase === 'object' ? (question.deckPhase.name || JSON.stringify(question.deckPhase)) : question.deckPhase;
+        const categoryText = typeof question.category === 'object'
+            ? (question.category.name || JSON.stringify(question.category))
+            : question.category;
+        const phaseText = typeof question.deckPhase === 'object'
+            ? (question.deckPhase.name || JSON.stringify(question.deckPhase))
+            : question.deckPhase;
         html += `
             <li>
                 <div class="question-text">${question.text}</div>
@@ -654,7 +626,6 @@ async function loadFeedback() {
         }
         
         displayFeedbackTable(questions);
-        
         console.log('Feedback loaded successfully');
     } catch (error) {
         console.error('Error loading feedback:', error);
@@ -729,7 +700,6 @@ async function displayFeedbackTable(questions) {
                 <td>${question.deckPhase || 'N/A'}</td>
                 <td colspan="3">Error loading feedback data</td>
             `;
-            
             tableBody.appendChild(row);
         }
     }
