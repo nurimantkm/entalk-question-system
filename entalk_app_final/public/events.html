@@ -115,32 +115,31 @@
             background-color: #f1f1f1;
         }
         /* CSS Fixes for Question Display */
-.question-list {
-    list-style-type: none;
-    padding: 0;
-}
-.question-list li {
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 10px;
-    margin-bottom: 10px;
-    background-color: #f9f9f9;
-}
-.question-text {
-    font-size: 16px;
-    margin-bottom: 8px;
-}
-.question-meta {
-    font-size: 12px;
-    color: #666;
-    display: flex;
-    justify-content: space-between;
-}
-
-/* Fix for questions section visibility */
-#questions-section {
-    display: block !important;
-}
+        .question-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .question-list li {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        .question-text {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .question-meta {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+        /* Fix for questions section visibility */
+        #questions-section {
+            display: block !important;
+        }
     </style>
 </head>
 <body>
@@ -251,5 +250,34 @@
     
     <script src="/js/app.js"></script>
     <script src="/js/events.js"></script>
+    <!-- Added script to populate dropdowns with plain text values -->
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Populate the "Category" dropdown for question generation
+        var catSelect = document.getElementById("question-category");
+        if (catSelect) {
+            var categories = ["Opinion", "Personal", "Hypothetical", "Reflective", "Cultural"];
+            catSelect.innerHTML = "";
+            categories.forEach(function(cat) {
+                var opt = document.createElement("option");
+                opt.value = cat;
+                opt.text = cat;
+                catSelect.appendChild(opt);
+            });
+        }
+        // Populate the "Deck Phase" dropdown for question generation
+        var phaseSelect = document.getElementById("question-phase");
+        if (phaseSelect) {
+            var phases = ["Warm-Up", "Personal", "Reflective", "Challenge"];
+            phaseSelect.innerHTML = "";
+            phases.forEach(function(phase) {
+                var opt = document.createElement("option");
+                opt.value = phase;
+                opt.text = phase;
+                phaseSelect.appendChild(opt);
+            });
+        }
+    });
+    </script>
 </body>
 </html>
