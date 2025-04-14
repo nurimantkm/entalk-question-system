@@ -1,93 +1,224 @@
-// Fixed server.js to resolve circular dependency issues
-
+// Enhanced server.js with persistent storage for Render.com free tier
 const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
+const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { User, Event, Question, Feedback, Location, QuestionDeck } = require('./models');
 
-// Load environment variables
-dotenv.config();
+// Initialize app
+const app = express();
+app.use(express.json());
+app.use(express.static('public'));
 
-// Initialize global arrays if they don't exist
-if (!global.users) global.users = [];
-if (!global.events) global.events = [];
-if (!global.questions) global.questions = [];
-if (!global.feedback) global.feedback = [];
-if (!global.locations) global.locations = [];
-if (!global.questionDecks) global.questionDecks = [];
+// Secret key for JWT
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
-// Initialize MongoDB connection if credentials are provided
-let mongoConnected = false;
-if (process.env.MONGODB_URI) {
-  try {
-    // MongoDB connection would be initialized here
-    console.log('MongoDB connection configured');
-    mongoConnected = true;
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    console.log('Falling back to in-memory data storage');
+// Server startup logging
+console.log('Server starting...');
+console.log('Current directory:', __dirname);
+
+// Data persistence configuration - use Render.com's persistent disk
+let DATA_DIR = '/var/data/entalk';
+console.log('Initial data directory path:', DATA_DIR);
+
+// Ensure data directory exists with proper error handling
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    console.log(`Created data directory at ${DATA_DIR}`);
   }
-} else {
-  console.log('No MongoDB URI provided, using in-memory data storage');
+} catch (error) {
+  console.error(`Error creating data directory: ${error.message}`);
+  // Fallback to a directory we know should work
+  DATA_DIR = path.join(__dirname, 'data');
+  console.log(`Falling back to data directory: ${DATA_DIR}`);
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    console.log(`Created fallback data directory at ${DATA_DIR}`);
+  }
+}
+
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const EVENTS_FILE = path.join(DATA_DIR, 'events.json');
+const LOCATIONS_FILE = path.join(DATA_DIR, 'locations.json');
+const QUESTIONS_FILE = path.join(DATA_DIR, 'questions.json');
+const FEEDBACK_FILE = path.join(DATA_DIR, 'feedback.json');
+
+// Environment variables for fallback storage
+const EVENTS_ENV_VAR = 'ENTALK_EVENTS_DATA';
+
+// Initialize global data
+global.users = [];
+global.events = [];
+global.locations = [];
+global.questions = [];
+global.feedback = [];
+
+// Load data from files if they exist
+function loadData() {
+  try {
+    console.log('Attempting to load data from files...');
+    
+    if (fs.existsSync(USERS_FILE)) {
+      global.users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+      console.log(`Loaded ${global.users.length} users from file`);
+    }
+    
+    if (fs.existsSync(EVENTS_FILE)) {
+      global.events = JSON.parse(fs.readFileSync(EVENTS_FILE, 'utf8'));
+      console.log(`Loaded ${global.events.length} events from file`);
+    } else if (process.env[EVENTS_ENV_VAR]) {
+      // Fallback to environment variable if file doesn't exist
+      try {
+        global.events = JSON.parse(process.env[EVENTS_ENV_VAR]);
+        console.log(`Loaded ${global.events.length} events from environment variable`);
+      } catch (error) {
+        console.error('Error loading events from environment variable:', error);
+      }
+    }
+    
+    if (fs.existsSync(LOCATIONS_FILE)) {
+      global.locations = JSON.parse(fs.readFileSync(LOCATIONS_FILE, 'utf8'));
+      console.log(`Loaded ${global.locations.length} locations from file`);
+    } else {
+      // Initialize default locations if file doesn't exist
+      initializeLocations();
+      saveData('locations');
+    }
+    
+    if (fs.existsSync(QUESTIONS_FILE)) {
+      global.questions = JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8'));
+      console.log(`Loaded ${global.questions.length} questions from file`);
+    }
+    
+    if (fs.existsSync(FEEDBACK_FILE)) {
+      global.feedback = JSON.parse(fs.readFileSync(FEEDBACK_FILE, 'utf8'));
+      console.log(`Loaded ${global.feedback.length} feedback items from file`);
+    }
+    
+    console.log('Data loading complete');
+  } catch (error) {
+    console.error('Error loading data from files:', error);
+  }
+}
+
+// Save data to files
+function saveData(dataType) {
+  console.log(`Attempting to save ${dataType} data to file`);
+  try {
+    switch (dataType) {
+      case 'users':
+        fs.writeFileSync(USERS_FILE, JSON.stringify(global.users, null, 2));
+        console.log(`Successfully saved ${global.users.length} users to file`);
+        break;
+      case 'events':
+        fs.writeFileSync(EVENTS_FILE, JSON.stringify(global.events, null, 2));
+        console.log(`Successfully saved ${global.events.length} events to file`);
+        
+        // Also save to environment variable as backup
+        try {
+          process.env[EVENTS_ENV_VAR] = JSON.stringify(global.events);
+          console.log('Saved events to environment variable as backup');
+        } catch (error) {
+          console.error('Error saving events to environment variable:', error);
+        }
+        break;
+      case 'locations':
+        fs.writeFileSync(LOCATIONS_FILE, JSON.stringify(global.locations, null, 2));
+        console.log(`Successfully saved ${global.locations.length} locations to file`);
+        break;
+      case 'questions':
+        fs.writeFileSync(QUESTIONS_FILE, JSON.stringify(global.questions, null, 2));
+        console.log(`Successfully saved ${global.questions.length} questions to file`);
+        break;
+      case 'feedback':
+        fs.writeFileSync(FEEDBACK_FILE, JSON.stringify(global.feedback, null, 2));
+        console.log(`Successfully saved ${global.feedback.length} feedback items to file`);
+        break;
+      default:
+        console.warn(`Unknown data type: ${dataType}`);
+    }
+  } catch (error) {
+    console.error(`Error saving ${dataType} data to file:`, error);
+    
+    // If saving to file fails and it's events data, try saving to environment variable
+    if (dataType === 'events') {
+      try {
+        process.env[EVENTS_ENV_VAR] = JSON.stringify(global.events);
+        console.log('Saved events to environment variable after file save failed');
+      } catch (backupError) {
+        console.error('Error saving events to environment variable:', backupError);
+      }
+    }
+  }
 }
 
 // Initialize locations
 function initializeLocations() {
-  if (global.locations.length === 0) {
-    const locationData = [
-      { name: 'Üsküdar', dayOfWeek: 1 },
-      { name: 'Bahçeşehir', dayOfWeek: 2 },
-      { name: 'Bostancı', dayOfWeek: 3 },
-      { name: 'Kadıköy', dayOfWeek: 4 },
-      { name: 'Beşiktaş', dayOfWeek: 5 },
-      { name: 'Mecidiyeköy', dayOfWeek: 6 }
-    ];
-    
-    locationData.forEach(loc => {
-      global.locations.push(new Location(loc.name, loc.dayOfWeek));
-    });
-    console.log(`Initialized ${global.locations.length} locations`);
-  }
-  return global.locations;
+  global.locations = [
+    { id: 'faszqdvgci4i1gt143dwbc', name: 'Üsküdar' },
+    { id: 'faszqdvgci4i1gt143dwbd', name: 'Bahçeşehir' },
+    { id: 'faszqdvgci4i1gt143dwbe', name: 'Bostancı' },
+    { id: 'faszqdvgci4i1gt143dwbf', name: 'Kadıköy' },
+    { id: 'faszqdvgci4i1gt143dwbg', name: 'Beşiktaş' },
+    { id: 'faszqdvgci4i1gt143dwbh', name: 'Mecidiyeköy' }
+  ];
+  console.log('Initialized 6 locations');
 }
 
-// Initialize locations at startup
-initializeLocations();
+// Load data at startup
+loadData();
 
-// Import services - after initializing global arrays and locations
-const questionService = require('./questionService');
-const openaiService = require('./openaiService');
-
-// Initialize OpenAI with API key from environment
-if (process.env.OPENAI_API_KEY) {
-  try {
-    openaiService.initializeOpenAI(process.env.OPENAI_API_KEY);
-    console.log('OpenAI initialized successfully');
-  } catch (error) {
-    console.error('Error initializing OpenAI:', error);
+// Models
+class User {
+  constructor(name, email, password) {
+    this.id = uuidv4();
+    this.name = name;
+    this.email = email;
+    this.password = password;
+    this.createdAt = new Date().toISOString();
   }
 }
 
-// Initialize Express app
-const app = express();
+class Event {
+  constructor(name, userId, date, capacity, description = '', locationId = null) {
+    this.id = uuidv4();
+    this.name = name;
+    this.userId = userId;
+    this.date = date || new Date().toISOString();
+    this.capacity = capacity || 20;
+    this.description = description;
+    this.locationId = locationId;
+    this.createdAt = new Date().toISOString();
+  }
+}
 
-// CORS middleware
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-}));
+class Question {
+  constructor(text, eventId, category, deckPhase) {
+    this.id = uuidv4();
+    this.text = text;
+    this.eventId = eventId;
+    this.category = category;
+    this.deckPhase = deckPhase;
+    this.createdAt = new Date().toISOString();
+  }
+}
+
+class Feedback {
+  constructor(questionId, eventId, locationId, feedbackType, userId) {
+    this.id = uuidv4();
+    this.questionId = questionId;
+    this.eventId = eventId;
+    this.locationId = locationId;
+    this.feedbackType = feedbackType;
+    this.userId = userId;
+    this.createdAt = new Date().toISOString();
+  }
+}
 
 // Middleware
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Authentication middleware
-const authenticateToken = (req, res, next) => {
+function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   
@@ -95,36 +226,33 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Authentication token required' });
   }
   
-  try {
-    const user = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    
     req.user = user;
     next();
-  } catch (error) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
-  }
-};
+  });
+}
 
-// API Routes
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    mongodb: mongoConnected ? 'connected' : 'disconnected',
-    openai: process.env.OPENAI_API_KEY ? 'configured' : 'not configured',
-    locations: global.locations.length
+// Routes
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'EnTalk Questions Tool API',
+    version: '1.0.0',
+    dataDirectory: DATA_DIR,
+    eventsCount: global.events.length
   });
 });
 
-// User registration
+// Register
 app.post('/api/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
     
     if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email and password are required' });
+      return res.status(400).json({ error: 'Name, email, and password are required' });
     }
     
     // Check if user already exists
@@ -139,22 +267,14 @@ app.post('/api/register', async (req, res) => {
     // Create new user
     const newUser = new User(name, email, hashedPassword);
     global.users.push(newUser);
+    saveData('users');
     
     // Generate token
-    const token = jwt.sign(
-      { id: newUser.id, email: newUser.email },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
+    const token = jwt.sign({ id: newUser.id, name: newUser.name, email: newUser.email }, JWT_SECRET, { expiresIn: '24h' });
     
     res.status(201).json({
       message: 'User registered successfully',
-      token,
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email
-      }
+      token
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -162,7 +282,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// User login
+// Login
 app.post('/api/auth', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -184,20 +304,11 @@ app.post('/api/auth', async (req, res) => {
     }
     
     // Generate token
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
+    const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
     
     res.json({
       message: 'Login successful',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
+      token
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -208,7 +319,8 @@ app.post('/api/auth', async (req, res) => {
 // Create event
 app.post('/api/events', authenticateToken, (req, res) => {
   try {
-    const { name, date, capacity } = req.body;
+    console.log('Creating event with data:', req.body);
+    const { name, date, capacity, description, locationId } = req.body;
     const userId = req.user.id;
     
     if (!name) {
@@ -216,8 +328,16 @@ app.post('/api/events', authenticateToken, (req, res) => {
     }
     
     // Create new event
-    const newEvent = new Event(name, userId, date, capacity);
+    const newEvent = new Event(name, userId, date, capacity, description, locationId);
     global.events.push(newEvent);
+    console.log(`Event created with ID: ${newEvent.id}`);
+    
+    // Save to persistent storage
+    saveData('events');
+    
+    // Log current events for debugging
+    console.log(`Current events (${global.events.length}):`, 
+      global.events.map(e => ({ id: e.id, name: e.name, userId: e.userId })));
     
     res.status(201).json({
       message: 'Event created successfully',
@@ -233,9 +353,12 @@ app.post('/api/events', authenticateToken, (req, res) => {
 app.get('/api/events', authenticateToken, (req, res) => {
   try {
     const userId = req.user.id;
+    console.log(`Getting events for user: ${userId}`);
+    console.log(`Total events in system: ${global.events.length}`);
     
     // Find user's events
     const userEvents = global.events.filter(e => e.userId === userId);
+    console.log(`Found ${userEvents.length} events for user ${userId}`);
     
     res.json(userEvents);
   } catch (error) {
@@ -252,6 +375,57 @@ app.get('/api/locations', (req, res) => {
   } catch (error) {
     console.error('Get locations error:', error);
     res.status(500).json({ error: 'Failed to retrieve locations' });
+  }
+});
+
+// Get question categories
+app.get('/api/categories', (req, res) => {
+  try {
+    const categories = [
+      "Ice Breakers",
+      "Personal Growth",
+      "Cultural Exchange",
+      "Language Learning",
+      "Professional Development",
+      "Hobbies & Interests",
+      "Travel & Adventure",
+      "Food & Cuisine",
+      "Arts & Entertainment",
+      "Technology & Innovation"
+    ];
+    
+    const categoriesWithDescriptions = categories.map(category => ({
+      name: category,
+      description: `Questions related to ${category.toLowerCase()}`
+    }));
+    
+    res.json(categoriesWithDescriptions);
+  } catch (error) {
+    console.error('Get categories error:', error);
+    res.status(500).json({ error: 'Failed to retrieve categories' });
+  }
+});
+
+// Get deck phases
+app.get('/api/phases', (req, res) => {
+  try {
+    const phases = [
+      "Introduction",
+      "Warm-up",
+      "Deep Dive",
+      "Reflection",
+      "Conclusion"
+    ];
+    
+    const phasesWithDescriptions = phases.map(phase => ({
+      name: phase,
+      description: `Questions for the ${phase.toLowerCase()} phase of conversation`
+    }));
+    
+    res.json(phasesWithDescriptions);
+  } catch (error) {
+    console.error('Get phases error:', error);
+    res.status(500).json({ error: 'Failed to retrieve phases' });
   }
 });
 
@@ -276,23 +450,24 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to access this event' });
     }
     
-    // Generate questions
-    let questions;
-    try {
-      questions = await openaiService.generateQuestions(
-        topic, 
-        count || 5, 
-        category, 
+    // Generate mock questions (replace with actual AI generation in production)
+    const mockQuestions = [];
+    for (let i = 0; i < (count || 5); i++) {
+      mockQuestions.push({
+        text: `What do you think about ${topic} in relation to everyday life? (Question ${i+1})`,
+        category,
         deckPhase
-      );
-    } catch (error) {
-      console.error('Error generating questions with OpenAI:', error);
-      // Use fallback mock questions
-      questions = generateMockQuestions(topic, count || 5, category, deckPhase);
+      });
     }
     
     // Save questions
-    const savedQuestions = questionService.createQuestions(questions, eventId);
+    const savedQuestions = mockQuestions.map(q => {
+      const question = new Question(q.text, eventId, q.category, q.deckPhase);
+      global.questions.push(question);
+      return question;
+    });
+    
+    saveData('questions');
     
     res.json({
       message: 'Questions generated successfully',
@@ -301,46 +476,6 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Generate questions error:', error);
     res.status(500).json({ error: 'Failed to generate questions' });
-  }
-});
-
-// Generate question deck
-app.post('/api/decks', authenticateToken, async (req, res) => {
-  try {
-    const { eventId, locationId } = req.body;
-    
-    if (!eventId || !locationId) {
-      return res.status(400).json({ 
-        error: 'Event ID and location ID are required' 
-      });
-    }
-    
-    // Validate event exists and belongs to user
-    const event = global.events.find(e => e.id === eventId);
-    if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
-    }
-    
-    if (event.userId !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to access this event' });
-    }
-    
-    // Validate location exists
-    const location = global.locations.find(l => l.id === locationId);
-    if (!location) {
-      return res.status(404).json({ error: 'Location not found' });
-    }
-    
-    // Generate deck
-    const deck = await questionService.generateQuestionDeck(locationId, eventId);
-    
-    res.json({
-      message: 'Question deck generated successfully',
-      deck
-    });
-  } catch (error) {
-    console.error('Generate deck error:', error);
-    res.status(500).json({ error: 'Failed to generate question deck' });
   }
 });
 
@@ -355,18 +490,14 @@ app.post('/api/feedback', async (req, res) => {
       });
     }
     
-    // Record feedback
-    const feedback = questionService.recordFeedback(
-      questionId, 
-      eventId, 
-      locationId, 
-      feedbackType, 
-      userId
-    );
+    // Create feedback
+    const newFeedback = new Feedback(questionId, eventId, locationId, feedbackType, userId);
+    global.feedback.push(newFeedback);
+    saveData('feedback');
     
-    res.json({
+    res.status(201).json({
       message: 'Feedback recorded successfully',
-      feedback
+      feedback: newFeedback
     });
   } catch (error) {
     console.error('Record feedback error:', error);
@@ -389,14 +520,29 @@ app.get('/api/feedback/:eventId', authenticateToken, (req, res) => {
       return res.status(403).json({ error: 'Not authorized to access this event' });
     }
     
-    // Get questions for this event
+    // Get feedback for event
+    const eventFeedback = global.feedback.filter(f => f.eventId === eventId);
+    
+    // Get questions for event
     const eventQuestions = global.questions.filter(q => q.eventId === eventId);
     
-    // Get feedback stats for each question
-    const feedbackStats = eventQuestions.map(q => ({
-      question: q,
-      stats: questionService.getFeedbackStats(q.id)
-    }));
+    // Calculate feedback stats
+    const feedbackStats = eventQuestions.map(question => {
+      const questionFeedback = eventFeedback.filter(f => f.questionId === question.id);
+      const positiveCount = questionFeedback.filter(f => f.feedbackType === 'positive').length;
+      const negativeCount = questionFeedback.filter(f => f.feedbackType === 'negative').length;
+      const totalCount = questionFeedback.length;
+      
+      return {
+        question: question.text,
+        category: question.category,
+        deckPhase: question.deckPhase,
+        positiveCount,
+        negativeCount,
+        totalCount,
+        positivePercentage: totalCount > 0 ? (positiveCount / totalCount) * 100 : 0
+      };
+    });
     
     res.json(feedbackStats);
   } catch (error) {
@@ -405,35 +551,36 @@ app.get('/api/feedback/:eventId', authenticateToken, (req, res) => {
   }
 });
 
-// Get question categories
-app.get('/api/categories', (req, res) => {
+// Debug endpoint to check data storage
+app.get('/api/debug/storage', (req, res) => {
   try {
-    const categories = questionService.getQuestionCategories();
-    const categoriesWithDescriptions = categories.map(category => ({
-      name: category,
-      description: questionService.getCategoryDescription(category)
-    }));
+    const storageInfo = {
+      dataDirectory: DATA_DIR,
+      filesExist: {
+        users: fs.existsSync(USERS_FILE),
+        events: fs.existsSync(EVENTS_FILE),
+        locations: fs.existsSync(LOCATIONS_FILE),
+        questions: fs.existsSync(QUESTIONS_FILE),
+        feedback: fs.existsSync(FEEDBACK_FILE)
+      },
+      counts: {
+        users: global.users.length,
+        events: global.events.length,
+        locations: global.locations.length,
+        questions: global.questions.length,
+        feedback: global.feedback.length
+      },
+      environmentVariables: {
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: process.env.PORT,
+        eventsInEnvVar: !!process.env[EVENTS_ENV_VAR]
+      }
+    };
     
-    res.json(categoriesWithDescriptions);
+    res.json(storageInfo);
   } catch (error) {
-    console.error('Get categories error:', error);
-    res.status(500).json({ error: 'Failed to retrieve categories' });
-  }
-});
-
-// Get deck phases
-app.get('/api/phases', (req, res) => {
-  try {
-    const phases = questionService.getDeckPhases();
-    const phasesWithDescriptions = phases.map(phase => ({
-      name: phase,
-      description: questionService.getPhaseDescription(phase)
-    }));
-    
-    res.json(phasesWithDescriptions);
-  } catch (error) {
-    console.error('Get phases error:', error);
-    res.status(500).json({ error: 'Failed to retrieve phases' });
+    console.error('Debug storage error:', error);
+    res.status(500).json({ error: 'Failed to retrieve storage information' });
   }
 });
 
@@ -464,6 +611,7 @@ if (process.env.NODE_ENV !== 'production') {
       // Create new user
       const newUser = new User(name, email, hashedPassword);
       global.users.push(newUser);
+      saveData('users');
       
       // Create test event
       const eventName = 'Test Event';
@@ -472,6 +620,7 @@ if (process.env.NODE_ENV !== 'production') {
       
       const newEvent = new Event(eventName, newUser.id, eventDate, eventCapacity);
       global.events.push(newEvent);
+      saveData('events');
       
       res.status(201).json({
         message: 'Test user and event created successfully',
@@ -490,24 +639,8 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Fallback mock question generator
-function generateMockQuestions(topic, count, category, deckPhase) {
-  const mockQuestions = [];
-  
-  for (let i = 0; i < count; i++) {
-    mockQuestions.push({
-      text: `What do you think about ${topic} in relation to everyday life? (Mock question ${i+1})`,
-      category,
-      deckPhase,
-      isNovelty: false
-    });
-  }
-  
-  return mockQuestions;
-}
-
-// Serve HTML for all other routes
-app.get('*', (req, res) => {
+// Serve frontend for all other routes
+app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -515,4 +648,6 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Data directory: ${DATA_DIR}`);
+  console.log(`Events count: ${global.events.length}`);
 });
