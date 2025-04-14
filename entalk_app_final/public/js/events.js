@@ -1,5 +1,46 @@
 // events.js
 
+// Define populateDropdown function first
+function populateDropdown(selectElement, options, values = null) {
+    if (!selectElement) {
+        console.warn('Cannot populate dropdown: select element is null');
+        return;
+    }
+    
+    // Clear existing options
+    selectElement.innerHTML = '';
+    
+    // Add default option
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = '-- Select --';
+    selectElement.appendChild(defaultOption);
+    
+    options.forEach((option, index) => {
+        const optionElement = document.createElement('option');
+        let optionValue;
+        let optionText;
+        
+        if (values && values[index]) {
+            optionValue = values[index];
+        } else if (typeof option === 'object' && option !== null) {
+            optionValue = option.id || '';
+        } else {
+            optionValue = option;
+        }
+        
+        if (typeof option === 'object' && option !== null) {
+            optionText = option.name || JSON.stringify(option);
+        } else {
+            optionText = option;
+        }
+        
+        optionElement.value = optionValue;
+        optionElement.textContent = optionText;
+        selectElement.appendChild(optionElement);
+    });
+}
+
 // Global variables
 let currentEventId = '';
 let currentQuestions = [];
@@ -95,12 +136,12 @@ function initializeDefaultCategoriesAndPhases() {
     }
 }
 
-// Load categories and phases from the API (if available)
+// Load categories and phases from API (if available)
 async function loadCategoriesAndPhases() {
     try {
         console.log('Loading categories and phases from API...');
         
-        // Load categories
+        // Categories
         const categoriesResponse = await fetch('/api/categories', {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -118,7 +159,7 @@ async function loadCategoriesAndPhases() {
             console.warn('Failed to load categories from API, using defaults');
         }
         
-        // Load phases
+        // Phases
         const phasesResponse = await fetch('/api/phases', {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
