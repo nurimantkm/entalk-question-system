@@ -1,6 +1,6 @@
 // Updated events.js with improved error handling and default categories/phases
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener (function() {
     // Initialize the page
     init();
 });
