@@ -430,23 +430,16 @@ async function selectEvent(eventId) {
     }
 }
 
-// Generate questions
-async function generateQuestions(e) {
-    if (e) e.preventDefault();
-    
-    const eventSelect = document.getElementById('event-select');
+// Fixed version of events.js with corrected question generation endpoint
+// This fixes the 404 error when generating questions
+
+async function generateQuestions() {
+    const eventId = document.getElementById('event-select').value;
     const topicInput = document.getElementById('question-topic');
     const countInput = document.getElementById('question-count');
     const categorySelect = document.getElementById('question-category');
     const phaseSelect = document.getElementById('question-phase');
     
-    if (!eventSelect || !topicInput || !countInput || !categorySelect || !phaseSelect) {
-        console.error('One or more form elements not found');
-        showAlert('Form error: Missing elements', 'danger');
-        return;
-    }
-    
-    const eventId = eventSelect.value;
     const topic = topicInput.value;
     const count = countInput.value;
     const category = categorySelect.value;
@@ -466,13 +459,16 @@ async function generateQuestions(e) {
         console.log('Generating questions...');
         showAlert('Generating questions... This may take a moment.', 'info');
         
-        const response = await fetch('/api/questions/generate', {
+        // FIXED: Changed endpoint from '/api/questions/generate' to '/api/questions'
+        // to match the server implementation
+        const response = await fetch('/api/questions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({
+                eventId, // Added eventId to the request body
                 topic,
                 count: parseInt(count),
                 category,
@@ -499,7 +495,7 @@ async function generateQuestions(e) {
         console.log('Questions generated successfully:', currentQuestions.length);
     } catch (error) {
         console.error('Error generating questions:', error);
-        showAlert('Failed to generate questions: ' + error.message, 'danger');
+        showAlert(`Error generating questions: ${error.message}`, 'danger');
     }
 }
 
