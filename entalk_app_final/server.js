@@ -141,7 +141,6 @@ function saveData(dataType) {
     }
   } catch (error) {
     console.error(`Error saving ${dataType} data to file:`, error);
-    
     // If saving to file fails and it's events data, try saving to environment variable
     if (dataType === 'events') {
       try {
@@ -217,7 +216,7 @@ class Feedback {
   }
 }
 
-// Middleware
+// Middleware for token authentication
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -237,6 +236,7 @@ function authenticateToken(req, res, next) {
 }
 
 // Routes
+
 app.get('/api', (req, res) => {
   res.json({
     message: 'EnTalk Questions Tool API',
@@ -255,21 +255,16 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
     
-    // Check if user already exists
     const existingUser = global.users.find(u => u.email === email);
     if (existingUser) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
     
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Create new user
     const newUser = new User(name, email, hashedPassword);
     global.users.push(newUser);
     saveData('users');
     
-    // Generate token
     const token = jwt.sign({ id: newUser.id, name: newUser.name, email: newUser.email }, JWT_SECRET, { expiresIn: '24h' });
     
     res.status(201).json({
@@ -291,19 +286,16 @@ app.post('/api/auth', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
     
-    // Find user
     const user = global.users.find(u => u.email === email);
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     
-    // Check password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     
-    // Generate token
     const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
     
     res.json({
@@ -327,15 +319,12 @@ app.post('/api/events', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Event name is required' });
     }
     
-    // Create new event
     const newEvent = new Event(name, userId, date, capacity, description, locationId);
     global.events.push(newEvent);
     console.log(`Event created with ID: ${newEvent.id}`);
     
-    // Save to persistent storage
     saveData('events');
     
-    // Log current events for debugging
     console.log(`Current events (${global.events.length}):`, 
       global.events.map(e => ({ id: e.id, name: e.name, userId: e.userId })));
     
@@ -356,7 +345,6 @@ app.get('/api/events', authenticateToken, (req, res) => {
     console.log(`Getting events for user: ${userId}`);
     console.log(`Total events in system: ${global.events.length}`);
     
-    // Find user's events
     const userEvents = global.events.filter(e => e.userId === userId);
     console.log(`Found ${userEvents.length} events for user ${userId}`);
     
@@ -479,6 +467,39 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
   }
 });
 
+// NEW: Generate question deck endpoint
+app.post('/api/decks/generate/:locationId', authenticateToken, (req, res) => {
+  try {
+    const { eventId } = req.body;
+    const { locationId } = req.params;
+    
+    if (!eventId || !locationId) {
+      return res.status(400).json({ error: 'Event ID and location ID are required' });
+    }
+    
+    // Validate event exists and belongs to user
+    const event = global.events.find(e => e.id === eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    if (event.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to access this event' });
+    }
+    
+    // Generate a mock deck:
+    const deck = {
+      accessCode: Math.random().toString(36).substring(2, 8).toUpperCase(), // random 6-character code
+      questions: global.questions.filter(q => q.eventId === eventId),
+      date: new Date().toISOString()
+    };
+    
+    res.json(deck);
+  } catch (error) {
+    console.error('Generate deck error:', error);
+    res.status(500).json({ error: 'Failed to generate deck' });
+  }
+});
+
 // Record question feedback
 app.post('/api/feedback', async (req, res) => {
   try {
@@ -490,7 +511,6 @@ app.post('/api/feedback', async (req, res) => {
       });
     }
     
-    // Create feedback
     const newFeedback = new Feedback(questionId, eventId, locationId, feedbackType, userId);
     global.feedback.push(newFeedback);
     saveData('feedback');
@@ -510,23 +530,17 @@ app.get('/api/feedback/:eventId', authenticateToken, (req, res) => {
   try {
     const { eventId } = req.params;
     
-    // Validate event exists and belongs to user
     const event = global.events.find(e => e.id === eventId);
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
-    
     if (event.userId !== req.user.id) {
       return res.status(403).json({ error: 'Not authorized to access this event' });
     }
     
-    // Get feedback for event
     const eventFeedback = global.feedback.filter(f => f.eventId === eventId);
-    
-    // Get questions for event
     const eventQuestions = global.questions.filter(q => q.eventId === eventId);
     
-    // Calculate feedback stats
     const feedbackStats = eventQuestions.map(question => {
       const questionFeedback = eventFeedback.filter(f => f.questionId === question.id);
       const positiveCount = questionFeedback.filter(f => f.feedbackType === 'positive').length;
@@ -592,7 +606,6 @@ if (process.env.NODE_ENV !== 'production') {
       const email = 'test@example.com';
       const password = 'test123';
       
-      // Check if user already exists
       const existingUser = global.users.find(u => u.email === email);
       if (existingUser) {
         return res.json({ 
@@ -605,15 +618,11 @@ if (process.env.NODE_ENV !== 'production') {
         });
       }
       
-      // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
-      
-      // Create new user
       const newUser = new User(name, email, hashedPassword);
       global.users.push(newUser);
       saveData('users');
       
-      // Create test event
       const eventName = 'Test Event';
       const eventDate = new Date().toISOString();
       const eventCapacity = 20;
@@ -628,7 +637,7 @@ if (process.env.NODE_ENV !== 'production') {
           id: newUser.id,
           name: newUser.name,
           email: newUser.email,
-          password: 'test123' // Only included for testing
+          password: 'test123'
         },
         event: newEvent
       });
