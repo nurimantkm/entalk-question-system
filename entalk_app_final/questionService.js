@@ -1,443 +1,330 @@
-// routes.js - Fixed version with improved location handling and feedback functionality
+// questionService.js - Fixed version with circular dependency resolved
 
-const express = require('express');
-const router = express.Router();
-const { User } = require('./models');
-const { Event } = require('./models');
-const questionService = require('./questionService');
-const openaiService = require('./openaiService');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { Question, Feedback, Location, QuestionDeck } = require('./models');
+const openai = require('openai');
 
-// Initialize OpenAI with API key from environment
-if (process.env.OPENAI_API_KEY) {
-  try {
-    openaiService.initializeOpenAI(process.env.OPENAI_API_KEY);
-    console.log('OpenAI initialized successfully');
-  } catch (error) {
-    console.error('Error initializing OpenAI:', error);
-  }
-}
+// Initialize global arrays if they don't exist
+if (!global.questions) global.questions = [];
+if (!global.feedback) global.feedback = [];
+if (!global.questionDecks) global.questionDecks = [];
 
-// Initialize locations
-questionService.initializeLocations();
-
-// Authentication middleware
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).json({ error: 'Authentication token required' });
-  }
-  
-  try {
-    const user = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
-  }
-};
-
-// Health check endpoint
-router.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    mongodb: global.mongoConnected ? 'connected' : 'disconnected',
-    openai: process.env.OPENAI_API_KEY ? 'configured' : 'not configured'
-  });
-});
-
-// User registration
-router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-    
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email and password are required' });
-    }
-    
-    // Check if user already exists
-    const existingUser = global.users.find(u => u.email === email);
-    if (existingUser) {
-      return res.status(400).json({ error: 'User with this email already exists' });
-    }
-    
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Create new user
-    const newUser = new User(name, email, hashedPassword);
-    global.users.push(newUser);
-    
-    // Generate token
-    const token = jwt.sign(
-      { id: newUser.id, email: newUser.email },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
-    
-    res.status(201).json({
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email
-      }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
-  }
-});
-
-// User login
-router.post('/auth', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-    
-    // Find user
-    const user = global.users.find(u => u.email === email);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-    
-    // Check password
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-    
-    // Generate token
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
-    
-    res.json({
-      message: 'Login successful',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
-
-// Create event
-router.post('/events', authenticateToken, (req, res) => {
-  try {
-    const { name, date, capacity } = req.body;
-    const userId = req.user.id;
-    
-    if (!name) {
-      return res.status(400).json({ error: 'Event name is required' });
-    }
-    
-    // Create new event
-    const newEvent = new Event(name, userId, date, capacity);
-    global.events.push(newEvent);
-    
-    res.status(201).json({
-      message: 'Event created successfully',
-      event: newEvent
-    });
-  } catch (error) {
-    console.error('Event creation error:', error);
-    res.status(500).json({ error: 'Event creation failed' });
-  }
-});
-
-// Get user's events
-router.get('/events', authenticateToken, (req, res) => {
-  try {
-    const userId = req.user.id;
-    
-    // Find user's events
-    const userEvents = global.events.filter(e => e.userId === userId);
-    
-    res.json(userEvents);
-  } catch (error) {
-    console.error('Get events error:', error);
-    res.status(500).json({ error: 'Failed to retrieve events' });
-  }
-});
+// REMOVED: initializeLocations function is now in server.js
+// This resolves the circular dependency issue
 
 // Get all locations
-router.get('/locations', (req, res) => {
-  try {
-    const locations = questionService.getLocations();
-    res.json(locations);
-  } catch (error) {
-    console.error('Get locations error:', error);
-    res.status(500).json({ error: 'Failed to retrieve locations' });
-  }
-});
-
-// Generate questions
-router.post('/questions', authenticateToken, async (req, res) => {
-  try {
-    const { eventId, topic, count, category, deckPhase } = req.body;
-    
-    if (!eventId || !topic || !category || !deckPhase) {
-      return res.status(400).json({ 
-        error: 'Event ID, topic, category, and deck phase are required' 
-      });
-    }
-    
-    // Validate event exists and belongs to user
-    const event = global.events.find(e => e.id === eventId);
-    if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
-    }
-    
-    if (event.userId !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to access this event' });
-    }
-    
-    // Generate questions
-    let questions;
-    try {
-      questions = await openaiService.generateQuestions(
-        topic, 
-        count || 5, 
-        category, 
-        deckPhase
-      );
-    } catch (error) {
-      console.error('Error generating questions with OpenAI:', error);
-      // Use fallback mock questions
-      questions = generateMockQuestions(topic, count || 5, category, deckPhase);
-    }
-    
-    // Save questions
-    const savedQuestions = questionService.createQuestions(questions, eventId);
-    
-    res.json({
-      message: 'Questions generated successfully',
-      questions: savedQuestions
-    });
-  } catch (error) {
-    console.error('Generate questions error:', error);
-    res.status(500).json({ error: 'Failed to generate questions' });
-  }
-});
-
-// Generate question deck
-router.post('/decks', authenticateToken, async (req, res) => {
-  try {
-    const { eventId, locationId } = req.body;
-    
-    if (!eventId || !locationId) {
-      return res.status(400).json({ 
-        error: 'Event ID and location ID are required' 
-      });
-    }
-    
-    // Validate event exists and belongs to user
-    const event = global.events.find(e => e.id === eventId);
-    if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
-    }
-    
-    if (event.userId !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to access this event' });
-    }
-    
-    // Validate location exists
-    const location = global.locations.find(l => l.id === locationId);
-    if (!location) {
-      return res.status(404).json({ error: 'Location not found' });
-    }
-    
-    // Generate deck
-    const deck = await questionService.generateQuestionDeck(locationId, eventId);
-    
-    res.json({
-      message: 'Question deck generated successfully',
-      deck
-    });
-  } catch (error) {
-    console.error('Generate deck error:', error);
-    res.status(500).json({ error: 'Failed to generate question deck' });
-  }
-});
-
-// Record question feedback
-router.post('/feedback', async (req, res) => {
-  try {
-    const { questionId, eventId, locationId, feedbackType, userId } = req.body;
-    
-    if (!questionId || !eventId || !locationId || !feedbackType) {
-      return res.status(400).json({ 
-        error: 'Question ID, event ID, location ID, and feedback type are required' 
-      });
-    }
-    
-    // Record feedback
-    const feedback = questionService.recordFeedback(
-      questionId, 
-      eventId, 
-      locationId, 
-      feedbackType, 
-      userId
-    );
-    
-    res.json({
-      message: 'Feedback recorded successfully',
-      feedback
-    });
-  } catch (error) {
-    console.error('Record feedback error:', error);
-    res.status(500).json({ error: 'Failed to record feedback' });
-  }
-});
-
-// Get feedback for event
-router.get('/feedback/:eventId', authenticateToken, (req, res) => {
-  try {
-    const { eventId } = req.params;
-    
-    // Validate event exists and belongs to user
-    const event = global.events.find(e => e.id === eventId);
-    if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
-    }
-    
-    if (event.userId !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to access this event' });
-    }
-    
-    // Get questions for this event
-    const eventQuestions = global.questions.filter(q => q.eventId === eventId);
-    
-    // Get feedback stats for each question
-    const feedbackStats = eventQuestions.map(q => ({
-      question: q,
-      stats: questionService.getFeedbackStats(q.id)
-    }));
-    
-    res.json(feedbackStats);
-  } catch (error) {
-    console.error('Get feedback error:', error);
-    res.status(500).json({ error: 'Failed to retrieve feedback' });
-  }
-});
-
-// Get question categories
-router.get('/categories', (req, res) => {
-  try {
-    const categories = questionService.getQuestionCategories();
-    const categoriesWithDescriptions = categories.map(category => ({
-      name: category,
-      description: questionService.getCategoryDescription(category)
-    }));
-    
-    res.json(categoriesWithDescriptions);
-  } catch (error) {
-    console.error('Get categories error:', error);
-    res.status(500).json({ error: 'Failed to retrieve categories' });
-  }
-});
-
-// Get deck phases
-router.get('/phases', (req, res) => {
-  try {
-    const phases = questionService.getDeckPhases();
-    const phasesWithDescriptions = phases.map(phase => ({
-      name: phase,
-      description: questionService.getPhaseDescription(phase)
-    }));
-    
-    res.json(phasesWithDescriptions);
-  } catch (error) {
-    console.error('Get phases error:', error);
-    res.status(500).json({ error: 'Failed to retrieve phases' });
-  }
-});
-
-// Debug endpoint to create a test user (only in development)
-if (process.env.NODE_ENV !== 'production') {
-  router.post('/debug/create-test-user', async (req, res) => {
-    try {
-      const name = 'Test User';
-      const email = 'test@example.com';
-      const password = 'test123';
-      
-      // Check if user already exists
-      const existingUser = global.users.find(u => u.email === email);
-      if (existingUser) {
-        return res.json({ 
-          message: 'Test user already exists',
-          user: {
-            id: existingUser.id,
-            name: existingUser.name,
-            email: existingUser.email
-          }
-        });
-      }
-      
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      // Create new user
-      const newUser = new User(name, email, hashedPassword);
-      global.users.push(newUser);
-      
-      // Create test event
-      const eventName = 'Test Event';
-      const eventDate = new Date().toISOString();
-      const eventCapacity = 20;
-      
-      const newEvent = new Event(eventName, newUser.id, eventDate, eventCapacity);
-      global.events.push(newEvent);
-      
-      res.status(201).json({
-        message: 'Test user and event created successfully',
-        user: {
-          id: newUser.id,
-          name: newUser.name,
-          email: newUser.email,
-          password: 'test123' // Only included for testing
-        },
-        event: newEvent
-      });
-    } catch (error) {
-      console.error('Create test user error:', error);
-      res.status(500).json({ error: 'Failed to create test user' });
-    }
-  });
+function getLocations() {
+  return global.locations || [];
 }
 
-// Fallback mock question generator
-function generateMockQuestions(topic, count, category, deckPhase) {
+// Get all question categories
+function getQuestionCategories() {
+  return [
+    'Icebreaker',
+    'Personal',
+    'Opinion',
+    'Hypothetical',
+    'Reflective',
+    'Cultural'
+  ];
+}
+
+// Get all deck phases
+function getDeckPhases() {
+  return [
+    'Warm-Up',
+    'Personal',
+    'Reflective',
+    'Challenge'
+  ];
+}
+
+// Get category description
+function getCategoryDescription(category) {
+  const descriptions = {
+    'Icebreaker': 'Simple questions to start conversations and make people comfortable',
+    'Personal': 'Questions about personal experiences, preferences, and life',
+    'Opinion': 'Questions asking for thoughts on various topics or issues',
+    'Hypothetical': 'What-if scenarios that encourage creative thinking',
+    'Reflective': 'Questions that encourage deeper thinking about oneself',
+    'Cultural': 'Questions about traditions, customs, and cultural experiences'
+  };
+  return descriptions[category] || '';
+}
+
+// Get phase description
+function getPhaseDescription(phase) {
+  const descriptions = {
+    'Warm-Up': 'Easy questions to start the conversation',
+    'Personal': 'Questions about personal experiences and preferences',
+    'Reflective': 'Questions that encourage deeper thinking',
+    'Challenge': 'More complex or thought-provoking questions'
+  };
+  return descriptions[phase] || '';
+}
+
+// Create multiple questions with categories and phases
+function createQuestions(questions, eventId) {
+  const createdQuestions = [];
+  
+  questions.forEach(q => {
+    const question = new Question(
+      q.text,
+      eventId,
+      q.category,
+      q.deckPhase,
+      q.isNovelty || false
+    );
+    global.questions.push(question);
+    createdQuestions.push(question);
+  });
+  
+  return createdQuestions;
+}
+
+// Record feedback for a question
+function recordFeedback(questionId, eventId, locationId, feedbackType, userId = null) {
+  // Find the question
+  const question = global.questions.find(q => q.id === questionId);
+  if (!question) {
+    throw new Error('Question not found');
+  }
+  
+  // Create feedback record
+  const feedback = new Feedback(
+    questionId,
+    eventId,
+    locationId,
+    feedbackType,
+    userId
+  );
+  
+  // Update question performance
+  question.updatePerformance(feedbackType);
+  
+  // Save feedback
+  global.feedback.push(feedback);
+  
+  return feedback;
+}
+
+// Get feedback statistics for a question
+function getFeedbackStats(questionId) {
+  const question = global.questions.find(q => q.id === questionId);
+  if (!question) {
+    throw new Error('Question not found');
+  }
+  
+  return {
+    questionId,
+    views: question.performance.views,
+    likes: question.performance.likes,
+    dislikes: question.performance.dislikes,
+    likeRate: question.performance.views > 0 ? 
+      (question.performance.likes / question.performance.views) : 0,
+    score: question.performance.score
+  };
+}
+
+// Get questions that haven't been used at a location recently
+function getAvailableQuestionsForLocation(locationId, days = 28) {
+  return global.questions.filter(question => !question.wasUsedRecently(locationId, days));
+}
+
+// Select questions with balanced category coverage
+function selectWithCoverage(questions, count = 12) {
+  const categories = getQuestionCategories();
+  const phases = getDeckPhases();
+  const selected = [];
+  
+  // Ensure at least one question from each category
+  categories.forEach(category => {
+    const categoryQuestions = questions.filter(q => q.category === category);
+    if (categoryQuestions.length > 0) {
+      selected.push(categoryQuestions[0]);
+      // Remove from original array to avoid duplicates
+      const index = questions.findIndex(q => q.id === categoryQuestions[0].id);
+      if (index !== -1) questions.splice(index, 1);
+    }
+  });
+  
+  // Ensure at least one question from each phase
+  phases.forEach(phase => {
+    const phaseQuestions = questions.filter(q => q.deckPhase === phase);
+    if (phaseQuestions.length > 0) {
+      selected.push(phaseQuestions[0]);
+      // Remove from original array to avoid duplicates
+      const index = questions.findIndex(q => q.id === phaseQuestions[0].id);
+      if (index !== -1) questions.splice(index, 1);
+    }
+  });
+  
+  // Fill remaining slots with highest scored questions
+  const remaining = count - selected.length;
+  if (remaining > 0 && questions.length > 0) {
+    // Sort by score
+    questions.sort((a, b) => b.performance.score - a.performance.score);
+    selected.push(...questions.slice(0, remaining));
+  }
+  
+  return selected;
+}
+
+// Select novelty questions (creative or unusual)
+function selectNoveltyQuestions(questions, count = 3) {
+  // First try to find questions marked as novelty
+  let noveltyQuestions = questions.filter(q => q.isNovelty);
+  
+  // If not enough, select questions with lowest view counts (newer questions)
+  if (noveltyQuestions.length < count) {
+    const regularQuestions = questions
+      .filter(q => !q.isNovelty)
+      .sort((a, b) => a.performance.views - b.performance.views);
+    
+    noveltyQuestions = [
+      ...noveltyQuestions,
+      ...regularQuestions.slice(0, count - noveltyQuestions.length)
+    ];
+  }
+  
+  return noveltyQuestions.slice(0, count);
+}
+
+// Find missing categories in a set of questions
+function findMissingCategories(selectedQuestions) {
+  const categories = getQuestionCategories();
+  const selectedCategories = selectedQuestions.map(q => q.category);
+  
+  return categories.filter(category => !selectedCategories.includes(category));
+}
+
+// Generate questions using OpenAI
+async function generateAIQuestions(categories, phases, count = 5) {
+  // For now, return mock questions
+  // In production, this would call the OpenAI API
   const mockQuestions = [];
   
   for (let i = 0; i < count; i++) {
+    const category = categories[i % categories.length];
+    const phase = phases[i % phases.length];
+    
     mockQuestions.push({
-      text: `What do you think about ${topic} in relation to everyday life? (Mock question ${i+1})`,
+      text: `AI generated ${category} question for ${phase} phase #${i+1}`,
       category,
-      deckPhase,
-      isNovelty: false
+      deckPhase: phase,
+      isNovelty: true
     });
   }
   
   return mockQuestions;
 }
 
-module.exports = router;
+// Generate a deck of questions for a location
+async function generateQuestionDeck(locationId, eventId) {
+  // 1. Get available questions for this location
+  const availableQuestions = getAvailableQuestionsForLocation(locationId);
+  
+  // 2. Calculate scores for all questions
+  availableQuestions.forEach(q => q.calculateScore());
+  
+  // 3. Select main questions with category coverage
+  const mainQuestions = selectWithCoverage(
+    [...availableQuestions], // Create a copy to avoid modifying original
+    12
+  );
+  
+  // 4. Select novelty questions
+  const noveltyQuestions = selectNoveltyQuestions(
+    availableQuestions.filter(q => !mainQuestions.includes(q)),
+    3
+  );
+  
+  // 5. Combine and check if we have enough
+  let selectedQuestions = [...mainQuestions, ...noveltyQuestions];
+  
+  // 6. If not enough questions, generate with AI
+  if (selectedQuestions.length < 15) {
+    const missingCount = 15 - selectedQuestions.length;
+    const missingCategories = findMissingCategories(selectedQuestions);
+    const missingPhases = getDeckPhases().filter(phase => 
+      !selectedQuestions.some(q => q.deckPhase === phase)
+    );
+    
+    const aiQuestions = await generateAIQuestions(
+      missingCategories.length > 0 ? missingCategories : getQuestionCategories(),
+      missingPhases.length > 0 ? missingPhases : getDeckPhases(),
+      missingCount
+    );
+    
+    // Create the AI questions
+    const createdAiQuestions = createQuestions(aiQuestions, eventId);
+    selectedQuestions = [...selectedQuestions, ...createdAiQuestions];
+  }
+  
+  // 7. Record usage for all selected questions
+  selectedQuestions.forEach(q => q.recordUsage(locationId));
+  
+  // 8. Create and save the deck
+  const questionIds = selectedQuestions.map(q => q.id);
+  const deck = new QuestionDeck(eventId, locationId, questionIds);
+  global.questionDecks.push(deck);
+  
+  return deck;
+}
+
+// Get a deck by access code
+function getDeckByAccessCode(accessCode) {
+  const deck = global.questionDecks.find(d => d.accessCode === accessCode);
+  if (!deck) {
+    throw new Error('Deck not found');
+  }
+  
+  // Get the full questions
+  const questions = deck.questions.map(qId => 
+    global.questions.find(q => q.id === qId)
+  ).filter(q => q !== undefined);
+  
+  return {
+    ...deck,
+    questions
+  };
+}
+
+// Get active deck for a location
+function getActiveDeckForLocation(locationId) {
+  // Get the most recent deck for this location
+  const decks = global.questionDecks
+    .filter(d => d.locationId === locationId && d.active)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  if (decks.length === 0) {
+    return null;
+  }
+  
+  const deck = decks[0];
+  
+  // Get the full questions
+  const questions = deck.questions.map(qId => 
+    global.questions.find(q => q.id === qId)
+  ).filter(q => q !== undefined);
+  
+  return {
+    ...deck,
+    questions
+  };
+}
+
+module.exports = {
+  // REMOVED: initializeLocations,
+  getLocations, // Added this function to access locations
+  getQuestionCategories,
+  getDeckPhases,
+  getCategoryDescription,
+  getPhaseDescription,
+  createQuestions,
+  recordFeedback,
+  getFeedbackStats,
+  getAvailableQuestionsForLocation,
+  generateQuestionDeck,
+  getDeckByAccessCode,
+  getActiveDeckForLocation
+};
