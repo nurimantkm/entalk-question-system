@@ -1,4 +1,4 @@
-// Updated openaiService.js with improved mock question generation
+// Updated openaiService.js with fixed syntax error
 
 // Import the OpenAI library correctly for v3.2.1
 const { Configuration, OpenAIApi } = require('openai');
@@ -364,6 +364,278 @@ Return only the questions as a JSON array of strings.`;
       if (content.includes('[') && content.includes(']')) {
         const jsonStr = content.substring(
           content.indexOf('['),
-          con
-(Content truncated due to size limit. Use line ranges to read in chunks)
-        
+          content.lastIndexOf(']') + 1
+        );
+        questions = JSON.parse(jsonStr);
+      } else {
+        throw new Error('Response is not in JSON format');
+      }
+    } catch (e) {
+      console.error('Error parsing OpenAI response as JSON:', e);
+      // If not valid JSON, extract questions line by line
+      questions = content.split('\n')
+        .filter(line => line.trim().length > 0 && line.includes('?'))
+        .map(line => {
+          // Remove numbers, quotes, and other formatting
+          return line.replace(/^\d+[\.\)]\s*/, '').replace(/^["']|["']$/g, '').trim();
+        });
+    }
+
+    // Randomly assign categories and phases to novelty questions
+    const categories = [
+      'Icebreaker', 'Personal', 'Opinion', 
+      'Hypothetical', 'Reflective', 'Cultural'
+    ];
+    
+    const phases = [
+      'Warm-Up', 'Personal', 'Reflective', 'Challenge'
+    ];
+
+    // Format questions with random category and phase, marked as novelty
+    return questions.map(text => ({
+      text,
+      category: categories[Math.floor(Math.random() * categories.length)],
+      deckPhase: phases[Math.floor(Math.random() * phases.length)],
+      isNovelty: true
+    }));
+  } catch (error) {
+    console.error('Error generating novelty questions with OpenAI:', error);
+    // Return improved mock data instead of throwing an error
+    return generateImprovedMockNoveltyQuestions(count);
+  }
+}
+
+// Generate improved mock novelty questions when OpenAI fails
+function generateImprovedMockNoveltyQuestions(count) {
+  console.log('Generating improved mock novelty questions as fallback');
+  
+  const mockQuestions = [
+    "If your life had a soundtrack, which song would be playing right now?",
+    "What's the strangest talent you have that few people know about?",
+    "If you could instantly become an expert in something, what would it be?",
+    "What's the most unusual food combination you enjoy?",
+    "If you could have dinner with any fictional character, who would it be?",
+    "If animals could talk, which species would be the most annoying?",
+    "What's something you've done that you're pretty sure nobody else in this room has done?",
+    "If you had to lose one of your five senses, which would you choose and why?",
+    "What's the most ridiculous fact you know?",
+    "If you could teleport to any place for just 10 minutes, where would you go?",
+    "What's a question you've always wanted to be asked?",
+    "If you could know the absolute truth to one question, what would you ask?",
+    "What's the weirdest dream you've ever had?",
+    "If you could combine two animals to create a new one, what would it be?",
+    "What's something that's considered normal today that will seem bizarre in 100 years?",
+    "If you could have any fictional device or tool, what would you choose?",
+    "What's something you believed for way too long before finding out it wasn't true?",
+    "If you had to live in a TV show universe, which one would you choose?",
+    "What's a completely useless skill you'd like to master anyway?",
+    "If you could safely experience one natural disaster, which would you choose?"
+  ];
+  
+  // Randomly assign categories and phases
+  const categories = [
+    'Icebreaker', 'Personal', 'Opinion', 
+    'Hypothetical', 'Reflective', 'Cultural'
+  ];
+  
+  const phases = [
+    'Warm-Up', 'Personal', 'Reflective', 'Challenge'
+  ];
+  
+  const result = [];
+  for (let i = 0; i < count; i++) {
+    result.push({
+      text: mockQuestions[i % mockQuestions.length],
+      category: categories[Math.floor(Math.random() * categories.length)],
+      deckPhase: phases[Math.floor(Math.random() * phases.length)],
+      isNovelty: true
+    });
+  }
+  
+  return result;
+}
+
+// Fill missing categories with AI-generated questions
+async function fillMissingCategories(missingCategories, count = 1) {
+  if (!openaiClient) {
+    console.error('OpenAI client not initialized. Please provide a valid API key.');
+    // Return improved mock data instead of throwing an error
+    return generateImprovedMockCategoryQuestions(missingCategories, count);
+  }
+
+  const result = [];
+
+  for (const category of missingCategories) {
+    try {
+      console.log(`Generating ${count} questions for missing category: ${category}`);
+      
+      const categoryDescription = getCategoryDescription(category);
+      
+      const prompt = `Generate ${count} engaging conversation questions for English language practice.
+Category: ${category} (${categoryDescription})
+Make the questions creative, thought-provoking, and suitable for adult English learners.
+Return only the questions as a JSON array of strings.`;
+
+      // Use the correct method for OpenAI v3.2.1
+      const response = await openaiClient.createChatCompletion({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: "You are a helpful assistant that generates engaging conversation questions." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.8,
+        max_tokens: 500
+      });
+
+      // Parse the response to extract questions
+      const content = response.data.choices[0].message.content;
+      
+      let questions = [];
+
+      try {
+        // Try to parse as JSON directly
+        if (content.includes('[') && content.includes(']')) {
+          const jsonStr = content.substring(
+            content.indexOf('['),
+            content.lastIndexOf(']') + 1
+          );
+          questions = JSON.parse(jsonStr);
+        } else {
+          throw new Error('Response is not in JSON format');
+        }
+      } catch (e) {
+        console.error('Error parsing OpenAI response as JSON:', e);
+        // If not valid JSON, extract questions line by line
+        questions = content.split('\n')
+          .filter(line => line.trim().length > 0 && line.includes('?'))
+          .map(line => {
+            // Remove numbers, quotes, and other formatting
+            return line.replace(/^\d+[\.\)]\s*/, '').replace(/^["']|["']$/g, '').trim();
+          });
+      }
+
+      // Randomly assign phases to questions
+      const phases = [
+        'Warm-Up', 'Personal', 'Reflective', 'Challenge'
+      ];
+
+      // Format questions with category and random phase
+      const formattedQuestions = questions.map(text => ({
+        text,
+        category,
+        deckPhase: phases[Math.floor(Math.random() * phases.length)],
+        isNovelty: false
+      }));
+
+      result.push(...formattedQuestions);
+    } catch (error) {
+      console.error(`Error generating questions for category ${category}:`, error);
+      // Add improved mock questions for this category
+      const mockQuestions = generateImprovedMockCategoryQuestions([category], count);
+      result.push(...mockQuestions);
+    }
+  }
+
+  return result;
+}
+
+// Generate improved mock category questions when OpenAI fails
+function generateImprovedMockCategoryQuestions(categories, count = 1) {
+  console.log('Generating improved mock category questions as fallback');
+  
+  // Define question templates for each category
+  const categoryTemplates = {
+    'Icebreaker': [
+      "What's your favorite way to spend a weekend?",
+      "If you could have any pet, what would you choose?",
+      "What's your go-to comfort food?",
+      "What hobby would you like to try but haven't yet?",
+      "What's the best piece of advice you've ever received?"
+    ],
+    'Personal': [
+      "What's a challenge you've overcome that you're proud of?",
+      "How do you recharge when you're feeling drained?",
+      "What's something you're looking forward to in the coming year?",
+      "What personal habit are you trying to improve?",
+      "What's a skill you've developed that you're proud of?"
+    ],
+    'Opinion': [
+      "Do you think social media has overall been positive or negative for society?",
+      "What do you think is the most important quality in a friend?",
+      "How do you feel about the role of technology in education?",
+      "What's your take on the importance of work-life balance?",
+      "Do you think travel is essential for personal growth?"
+    ],
+    'Hypothetical': [
+      "If you could live in any time period, when would you choose?",
+      "If you could master any language instantly, which would you pick?",
+      "If you had to teach a class on any subject, what would you teach?",
+      "If you could have dinner with anyone from history, who would it be?",
+      "If you could solve one global problem, which would you choose?"
+    ],
+    'Reflective': [
+      "How have your priorities changed over the last few years?",
+      "What's something you've changed your mind about recently?",
+      "What life lesson took you the longest to learn?",
+      "How do you think your childhood influenced who you are today?",
+      "What do you think future generations will find most surprising about our current way of life?"
+    ],
+    'Cultural': [
+      "How has your cultural background shaped your values?",
+      "What cultural tradition is most meaningful to you?",
+      "How do you celebrate important milestones in your culture?",
+      "What aspect of another culture do you find most interesting?",
+      "How has exposure to different cultures enriched your life?"
+    ]
+  };
+  
+  const result = [];
+  const phases = ['Warm-Up', 'Personal', 'Reflective', 'Challenge'];
+  
+  for (const category of categories) {
+    const templates = categoryTemplates[category] || 
+      [`A thoughtful ${category} question to spark conversation?`];
+    
+    for (let i = 0; i < count; i++) {
+      result.push({
+        text: templates[i % templates.length],
+        category,
+        deckPhase: phases[Math.floor(Math.random() * phases.length)],
+        isNovelty: false
+      });
+    }
+  }
+  
+  return result;
+}
+
+// Get category description
+function getCategoryDescription(category) {
+  const descriptions = {
+    'Icebreaker': 'Simple questions to start conversations and make people comfortable',
+    'Personal': 'Questions about personal experiences, preferences, and life',
+    'Opinion': 'Questions asking for thoughts on various topics or issues',
+    'Hypothetical': 'What-if scenarios that encourage creative thinking',
+    'Reflective': 'Questions that encourage deeper thinking about oneself',
+    'Cultural': 'Questions about traditions, customs, and cultural experiences'
+  };
+  return descriptions[category] || '';
+}
+
+// Get phase description
+function getPhaseDescription(phase) {
+  const descriptions = {
+    'Warm-Up': 'Easy questions to start the conversation',
+    'Personal': 'Questions about personal experiences and preferences',
+    'Reflective': 'Questions that encourage deeper thinking',
+    'Challenge': 'More complex or thought-provoking questions'
+  };
+  return descriptions[phase] || '';
+}
+
+module.exports = {
+  initializeOpenAI,
+  generateQuestions,
+  generateNoveltyQuestions,
+  fillMissingCategories
+};
