@@ -54,6 +54,7 @@ global.events = [];
 global.locations = [];
 global.questions = [];
 global.feedback = [];
+global.decks = []; // NEW: to store generated decks
 
 // Load data from files if they exist
 function loadData() {
@@ -69,7 +70,6 @@ function loadData() {
       global.events = JSON.parse(fs.readFileSync(EVENTS_FILE, 'utf8'));
       console.log(`Loaded ${global.events.length} events from file`);
     } else if (process.env[EVENTS_ENV_VAR]) {
-      // Fallback to environment variable if file doesn't exist
       try {
         global.events = JSON.parse(process.env[EVENTS_ENV_VAR]);
         console.log(`Loaded ${global.events.length} events from environment variable`);
@@ -82,7 +82,6 @@ function loadData() {
       global.locations = JSON.parse(fs.readFileSync(LOCATIONS_FILE, 'utf8'));
       console.log(`Loaded ${global.locations.length} locations from file`);
     } else {
-      // Initialize default locations if file doesn't exist
       initializeLocations();
       saveData('locations');
     }
@@ -115,8 +114,6 @@ function saveData(dataType) {
       case 'events':
         fs.writeFileSync(EVENTS_FILE, JSON.stringify(global.events, null, 2));
         console.log(`Successfully saved ${global.events.length} events to file`);
-        
-        // Also save to environment variable as backup
         try {
           process.env[EVENTS_ENV_VAR] = JSON.stringify(global.events);
           console.log('Saved events to environment variable as backup');
@@ -141,7 +138,6 @@ function saveData(dataType) {
     }
   } catch (error) {
     console.error(`Error saving ${dataType} data to file:`, error);
-    // If saving to file fails and it's events data, try saving to environment variable
     if (dataType === 'events') {
       try {
         process.env[EVENTS_ENV_VAR] = JSON.stringify(global.events);
@@ -229,14 +225,12 @@ function authenticateToken(req, res, next) {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
-    
     req.user = user;
     next();
   });
 }
 
 // Routes
-
 app.get('/api', (req, res) => {
   res.json({
     message: 'EnTalk Questions Tool API',
@@ -266,7 +260,6 @@ app.post('/api/register', async (req, res) => {
     saveData('users');
     
     const token = jwt.sign({ id: newUser.id, name: newUser.name, email: newUser.email }, JWT_SECRET, { expiresIn: '24h' });
-    
     res.status(201).json({
       message: 'User registered successfully',
       token
@@ -297,7 +290,6 @@ app.post('/api/auth', async (req, res) => {
     }
     
     const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
-    
     res.json({
       message: 'Login successful',
       token
@@ -322,12 +314,9 @@ app.post('/api/events', authenticateToken, (req, res) => {
     const newEvent = new Event(name, userId, date, capacity, description, locationId);
     global.events.push(newEvent);
     console.log(`Event created with ID: ${newEvent.id}`);
-    
     saveData('events');
     
-    console.log(`Current events (${global.events.length}):`, 
-      global.events.map(e => ({ id: e.id, name: e.name, userId: e.userId })));
-    
+    console.log(`Current events (${global.events.length}):`, global.events.map(e => ({ id: e.id, name: e.name, userId: e.userId })));
     res.status(201).json({
       message: 'Event created successfully',
       event: newEvent
@@ -347,7 +336,6 @@ app.get('/api/events', authenticateToken, (req, res) => {
     
     const userEvents = global.events.filter(e => e.userId === userId);
     console.log(`Found ${userEvents.length} events for user ${userId}`);
-    
     res.json(userEvents);
   } catch (error) {
     console.error('Get events error:', error);
@@ -358,8 +346,7 @@ app.get('/api/events', authenticateToken, (req, res) => {
 // Get all locations
 app.get('/api/locations', (req, res) => {
   try {
-    const locations = global.locations;
-    res.json(locations);
+    res.json(global.locations);
   } catch (error) {
     console.error('Get locations error:', error);
     res.status(500).json({ error: 'Failed to retrieve locations' });
@@ -423,9 +410,7 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
     const { eventId, topic, count, category, deckPhase } = req.body;
     
     if (!eventId || !topic || !category || !deckPhase) {
-      return res.status(400).json({ 
-        error: 'Event ID, topic, category, and deck phase are required' 
-      });
+      return res.status(400).json({ error: 'Event ID, topic, category, and deck phase are required' });
     }
     
     // Validate event exists and belongs to user
@@ -456,11 +441,7 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
     });
     
     saveData('questions');
-    
-    res.json({
-      message: 'Questions generated successfully',
-      questions: savedQuestions
-    });
+    res.json({ message: 'Questions generated successfully', questions: savedQuestions });
   } catch (error) {
     console.error('Generate questions error:', error);
     res.status(500).json({ error: 'Failed to generate questions' });
@@ -493,10 +474,28 @@ app.post('/api/decks/generate/:locationId', authenticateToken, (req, res) => {
       date: new Date().toISOString()
     };
     
+    // Store the deck in global.decks for participant retrieval
+    global.decks.push(deck);
+    
     res.json(deck);
   } catch (error) {
     console.error('Generate deck error:', error);
     res.status(500).json({ error: 'Failed to generate deck' });
+  }
+});
+
+// NEW: Get deck by access code for participant view
+app.get('/api/decks/:accessCode', (req, res) => {
+  try {
+    const { accessCode } = req.params;
+    const deck = global.decks.find(d => d.accessCode === accessCode);
+    if (!deck) {
+      return res.status(404).json({ error: 'Deck not found' });
+    }
+    res.json(deck);
+  } catch (error) {
+    console.error('Get deck error:', error);
+    res.status(500).json({ error: 'Failed to retrieve deck' });
   }
 });
 
@@ -506,19 +505,14 @@ app.post('/api/feedback', async (req, res) => {
     const { questionId, eventId, locationId, feedbackType, userId } = req.body;
     
     if (!questionId || !eventId || !locationId || !feedbackType) {
-      return res.status(400).json({ 
-        error: 'Question ID, event ID, location ID, and feedback type are required' 
-      });
+      return res.status(400).json({ error: 'Question ID, event ID, location ID, and feedback type are required' });
     }
     
     const newFeedback = new Feedback(questionId, eventId, locationId, feedbackType, userId);
     global.feedback.push(newFeedback);
     saveData('feedback');
     
-    res.status(201).json({
-      message: 'Feedback recorded successfully',
-      feedback: newFeedback
-    });
+    res.status(201).json({ message: 'Feedback recorded successfully', feedback: newFeedback });
   } catch (error) {
     console.error('Record feedback error:', error);
     res.status(500).json({ error: 'Failed to record feedback' });
@@ -529,7 +523,6 @@ app.post('/api/feedback', async (req, res) => {
 app.get('/api/feedback/:eventId', authenticateToken, (req, res) => {
   try {
     const { eventId } = req.params;
-    
     const event = global.events.find(e => e.id === eventId);
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
@@ -590,7 +583,6 @@ app.get('/api/debug/storage', (req, res) => {
         eventsInEnvVar: !!process.env[EVENTS_ENV_VAR]
       }
     };
-    
     res.json(storageInfo);
   } catch (error) {
     console.error('Debug storage error:', error);
@@ -605,19 +597,10 @@ if (process.env.NODE_ENV !== 'production') {
       const name = 'Test User';
       const email = 'test@example.com';
       const password = 'test123';
-      
       const existingUser = global.users.find(u => u.email === email);
       if (existingUser) {
-        return res.json({ 
-          message: 'Test user already exists',
-          user: {
-            id: existingUser.id,
-            name: existingUser.name,
-            email: existingUser.email
-          }
-        });
+        return res.json({ message: 'Test user already exists', user: { id: existingUser.id, name: existingUser.name, email: existingUser.email } });
       }
-      
       const hashedPassword = await bcrypt.hash(password, 10);
       const newUser = new User(name, email, hashedPassword);
       global.users.push(newUser);
@@ -626,21 +609,11 @@ if (process.env.NODE_ENV !== 'production') {
       const eventName = 'Test Event';
       const eventDate = new Date().toISOString();
       const eventCapacity = 20;
-      
       const newEvent = new Event(eventName, newUser.id, eventDate, eventCapacity);
       global.events.push(newEvent);
       saveData('events');
       
-      res.status(201).json({
-        message: 'Test user and event created successfully',
-        user: {
-          id: newUser.id,
-          name: newUser.name,
-          email: newUser.email,
-          password: 'test123'
-        },
-        event: newEvent
-      });
+      res.status(201).json({ message: 'Test user and event created successfully', user: { id: newUser.id, name: newUser.name, email: newUser.email, password: 'test123' }, event: newEvent });
     } catch (error) {
       console.error('Create test user error:', error);
       res.status(500).json({ error: 'Failed to create test user' });
