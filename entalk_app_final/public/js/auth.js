@@ -1,3 +1,5 @@
+// Updated auth.js with improved error handling
+
 // Authentication related functions
 document.addEventListener('DOMContentLoaded', function() {
     // Check if we're on login or register page
@@ -20,12 +22,21 @@ document.addEventListener('DOMContentLoaded', function() {
 // Setup login form
 function setupLoginForm() {
     const loginForm = document.getElementById('login-form');
+    const alertContainer = document.getElementById('alert-container');
+    
+    if (!loginForm) {
+        console.error('Login form not found');
+        return;
+    }
     
     loginForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
+        
+        // Show loading state
+        showAlert('Logging in...', 'info');
         
         try {
             // Updated endpoint to match server.js
@@ -51,6 +62,11 @@ function setupLoginForm() {
 function setupRegisterForm() {
     const registerForm = document.getElementById('register-form');
     
+    if (!registerForm) {
+        console.error('Register form not found');
+        return;
+    }
+    
     registerForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -64,6 +80,9 @@ function setupRegisterForm() {
             showAlert('Passwords do not match');
             return;
         }
+        
+        // Show loading state
+        showAlert('Creating account...', 'info');
         
         try {
             // Updated endpoint to match server.js
@@ -85,7 +104,7 @@ function setupRegisterForm() {
     });
 }
 
-// API request helper function
+// API request helper function with improved error handling
 async function apiRequest(endpoint, method, data) {
     try {
         const response = await fetch(endpoint, {
@@ -97,12 +116,26 @@ async function apiRequest(endpoint, method, data) {
             body: data ? JSON.stringify(data) : undefined
         });
         
-        const responseData = await response.json();
-        
+        // Check if response is ok before trying to parse JSON
         if (!response.ok) {
-            throw new Error(responseData.msg || 'Request failed');
+            // Try to get error message from response if possible
+            try {
+                const errorData = await response.json();
+                throw new Error(errorData.msg || `Request failed with status ${response.status}`);
+            } catch (jsonError) {
+                // If JSON parsing fails, use status text
+                throw new Error(`Request failed with status ${response.status}: ${response.statusText}`);
+            }
         }
         
+        // Check if response is empty
+        const responseText = await response.text();
+        if (!responseText) {
+            throw new Error('Server returned an empty response');
+        }
+        
+        // Parse JSON only if we have content
+        const responseData = responseText ? JSON.parse(responseText) : {};
         return responseData;
     } catch (error) {
         console.error('API request error:', error);
@@ -113,7 +146,10 @@ async function apiRequest(endpoint, method, data) {
 // Show alert function
 function showAlert(message, type = 'danger') {
     const alertContainer = document.getElementById('alert-container');
-    if (!alertContainer) return;
+    if (!alertContainer) {
+        console.error('Alert container not found');
+        return;
+    }
     
     const alert = document.createElement('div');
     alert.className = `alert alert-${type}`;
