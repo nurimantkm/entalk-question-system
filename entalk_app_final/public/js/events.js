@@ -125,9 +125,9 @@ async function loadCategoriesAndPhases() {
         console.log('Loading categories and phases from API...');
         
         // Load categories
-        const categoriesResponse = await fetch('/api/questions/categories', {
+        const categoriesResponse = await fetch('/api/categories', {
             headers: {
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
         
@@ -143,9 +143,9 @@ async function loadCategoriesAndPhases() {
         }
         
         // Load phases
-        const phasesResponse = await fetch('/api/questions/phases', {
+        const phasesResponse = await fetch('/api/phases', {
             headers: {
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
         
