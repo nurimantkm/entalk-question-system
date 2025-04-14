@@ -172,7 +172,7 @@ async function loadLocations() {
         
         const response = await fetch('/api/locations', {
             headers: {
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
         
@@ -265,7 +265,7 @@ async function loadEvents() {
         
         const response = await fetch('/api/events', {
             headers: {
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
         
@@ -358,7 +358,7 @@ async function createEvent(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({
                 name,
@@ -470,7 +470,7 @@ async function generateQuestions(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({
                 topic,
@@ -571,7 +571,7 @@ async function saveQuestions() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({
                 questions: currentQuestions,
@@ -642,7 +642,7 @@ async function generateDeck(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({
                 eventId
