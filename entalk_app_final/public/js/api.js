@@ -1,12 +1,17 @@
 // API request helper function
 async function apiRequest(endpoint, method, data) {
     try {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        const token = localStorage.getItem('token');
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const response = await fetch(`/api${endpoint}`, {
             method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
+            headers: headers,
             body: data ? JSON.stringify(data) : undefined
         });
         
