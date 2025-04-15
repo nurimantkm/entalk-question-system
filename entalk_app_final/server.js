@@ -1,8 +1,16 @@
-// server.mongodb.js – A revised server file using MongoDB via Mongoose
+// Load environment variables
+const path = require('path');
+const MONGO_URI = process.env.MONGO_URI || 'your_mongo_connection_string_here';
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''; // if provided, used in your OpenAI module
+
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateNoveltyQuestions } = require('./openaiService');
+
+const mongoose = require('mongoose');
+const { v4: uuidv4 } = require('uuid');
 
 if (OPENAI_API_KEY) {
   console.log('OpenAI API key initialized.');
@@ -10,15 +18,6 @@ if (OPENAI_API_KEY) {
   console.log('OpenAI API key not provided.');
 }
 
-
-const path = require('path');
-const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
-
-// Load environment variables
-const MONGO_URI = process.env.MONGO_URI || 'your_mongo_connection_string_here';
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''; // if provided, used in your OpenAI module
 
 // Connect to MongoDB
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
