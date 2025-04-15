@@ -4,6 +4,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateNoveltyQuestions } = require('./openaiService');
 
+if (OPENAI_API_KEY) {
+  console.log('OpenAI API key initialized.');
+} else {
+  console.log('OpenAI API key not provided.');
+}
+
 
 const path = require('path');
 const mongoose = require('mongoose');
