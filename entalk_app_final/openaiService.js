@@ -91,7 +91,7 @@ Return only the questions as a JSON array of strings.`;
       isNovelty: false
     }));
   } catch (error) {
-    console.error('Error generating questions with OpenAI:', error);
+    console.error('Error generating questions with OpenAI:', error);// Updated logging to print full object
     // Return improved mock data instead of throwing an error
     return generateImprovedMockQuestions(topic, count, category, deckPhase);
   }
