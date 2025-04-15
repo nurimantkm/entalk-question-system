@@ -383,6 +383,7 @@ async function selectEvent(eventId) {
 // Generate questions for an event
 async function generateQuestions(e) {
     e.preventDefault();
+    console.log('Form submitted');
         const eventId = document.getElementById('event-select').value;
     const topic = document.getElementById('question-topic').value;
     const count = document.getElementById('question-count').value;
@@ -400,6 +401,8 @@ async function generateQuestions(e) {
     }
     
     try {
+        console.log('Form data:', { eventId, topic, count, category, deckPhase });
+
         console.log('Generating questions...');
         showAlert('Generating questions... This may take a moment.', 'info');
         
@@ -407,6 +410,7 @@ async function generateQuestions(e) {
         if (questionsSection) {
             questionsSection.style.display = 'block';
         }
+        console.log('Sending request to /api/questions with data:', { eventId, topic, count, category, deckPhase });
         
         const response = await fetch('/api/questions', {
             method: 'POST',
@@ -427,12 +431,14 @@ async function generateQuestions(e) {
             const errorData = await response.json();
             throw new Error(errorData.msg || 'Failed to generate questions');
         }
-        
+        console.log('Received response from /api/questions:', response);
+
         const data = await response.json();
+        console.log('Response data:', data);
         currentQuestions = data.questions || [];
         displayGeneratedQuestions(currentQuestions);
         showAlert('Questions generated successfully', 'success');
-        
+
         console.log('Questions generated successfully:', currentQuestions.length);
     } catch (error) {
         console.error('Error generating questions:', error);
