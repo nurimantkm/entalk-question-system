@@ -751,7 +751,7 @@ async function displayFeedbackTable(questions) {
                 <td colspan="3">Error loading feedback data</td>
             `;
             tableBody.appendChild(row);
-       }
+        }
     }
 }
 
