@@ -96,12 +96,8 @@ function setupEventListeners() {
         generateQuestionsForm.addEventListener('submit', generateQuestions);
     }
     
-    const generateDeckForm = document.getElementById('generate-deck-form');
-    if (generateDeckForm) {
-        generateDeckForm.addEventListener('submit', generateDeck);
-    }
-
-        // Add event listener for generate deck button
+    
+    // Add event listener for generate deck button
         const generateDeckBtn = document.getElementById('generate-deck-btn');
         if (generateDeckBtn) {
             generateDeckBtn.addEventListener('click', generateDeck);
