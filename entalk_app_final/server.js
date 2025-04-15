@@ -1,24 +1,31 @@
-// server.mongodb.js – Fixed version using Mongoose
-
-// 1. Required Modules
+// server.mongodb.js – A revised server file using MongoDB via Mongoose
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { generateNoveltyQuestions } = require('./openaiService');
+
+if (OPENAI_API_KEY) {
+  console.log('OpenAI API key initialized.');
+} else {
+  console.log('OpenAI API key not provided.');
+}
+
+
 const path = require('path');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
-// 2. Environment Variables (declared first)
+// Load environment variables
 const MONGO_URI = process.env.MONGO_URI || 'your_mongo_connection_string_here';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''; // if provided, used in your OpenAI module
 
-// 3. Connect to MongoDB
+// Connect to MongoDB
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected!'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
-// 4. Define Mongoose Schemas and Models
+// Define Mongoose Schemas and Models
 
 const userSchema = new mongoose.Schema({
   id: { type: String, default: uuidv4 },
@@ -76,12 +83,12 @@ const deckSchema = new mongoose.Schema({
 });
 const Deck = mongoose.model('Deck', deckSchema);
 
-// 5. Initialize Express App
+// Initialize Express app
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-// 6. Middleware for token authentication
+// Middleware for token authentication
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -99,7 +106,7 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// 7. API Routes
+// Routes
 
 app.get('/api', (req, res) => {
   res.json({
@@ -130,7 +137,7 @@ app.post('/api/register', async (req, res) => {
     res.status(201).json({ message: 'User registered successfully', token });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed: ' + error.message });
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
@@ -159,9 +166,7 @@ app.post('/api/events', authenticateToken, async (req, res) => {
     console.log('Creating event with data:', req.body);
     const { name, date, capacity, description, locationId } = req.body;
     const userId = req.user.id;
-    if (!name) {
-      return res.status(400).json({ error: 'Event name is required' });
-    }
+    if (!name) return res.status(400).json({ error: 'Event name is required' });
     
     const newEvent = new Event({ name, userId, date, capacity, description, locationId });
     await newEvent.save();
@@ -192,6 +197,7 @@ app.get('/api/locations', async (req, res) => {
   try {
     let locations = await Location.find();
     if (!locations || locations.length === 0) {
+      // Initialize default locations
       locations = [
         { id: 'faszqdvgci4i1gt143dwbc', name: 'Üsküdar' },
         { id: 'faszqdvgci4i1gt143dwbd', name: 'Bahçeşehir' },
@@ -268,10 +274,12 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Event ID, topic, category, and deck phase are required' });
     }
     
+    // Validate event exists and belongs to user
     const event = await Event.findOne({ id: eventId });
     if (!event) return res.status(404).json({ error: 'Event not found' });
     if (event.userId !== req.user.id) return res.status(403).json({ error: 'Not authorized for this event' });
     
+    // Generate mock questions (replace this with actual OpenAI generation logic)
     const mockQuestions = [];
     const num = count || 5;
     for (let i = 0; i < num; i++) {
@@ -282,9 +290,10 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
       });
     }
     
+    // Save questions to database
     const savedQuestions = await Promise.all(
       mockQuestions.map(async q => {
-        const question = new Question(q.text, eventId, q.category, q.deckPhase);
+        const question = new Question({ text: q.text, eventId, category: q.category, deckPhase: q.deckPhase });
         return await question.save();
       })
     );
@@ -309,7 +318,10 @@ app.post('/api/decks/generate/:locationId', authenticateToken, async (req, res) 
     if (!event) return res.status(404).json({ error: 'Event not found' });
     if (event.userId !== req.user.id) return res.status(403).json({ error: 'Not authorized for this event' });
     
+    // Retrieve questions for the event
     const questions = await Question.find({ eventId });
+    
+    // Generate a mock deck
     const deck = new Deck({
       accessCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
       eventId,
@@ -372,7 +384,78 @@ app.get('/api/feedback/:eventId', authenticateToken, async (req, res) => {
       const positiveCount = questionFeedback.filter(f => f.feedbackType === 'positive').length;
       const negativeCount = questionFeedback.filter(f => f.feedbackType === 'negative').length;
       const totalCount = questionFeedback.length;
-      
+      return {
+        question: question.text,
+        category: question.category,
+        deckPhase: question.deckPhase,
+        positiveCount,
+        negativeCount,
+        totalCount,
+        positivePercentage: totalCount > 0 ? (positiveCount / totalCount) * 100 : 0
+      };
+    });
+    
+    res.json(feedbackStats);
+  } catch (error) {
+    console.error('Get feedback error:', error);
+    res.status(500).json({ error: 'Failed to retrieve feedback' });
+  }
+});
+
+// Get feedback for event
+app.get('/api/questions/:eventId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params; // Extract eventId from request parameters
+    const userId = req.user.id; // Extract user ID from authenticated user
+    console.log(`[GET /api/questions/${eventId}] Request received. EventId: ${eventId}, UserId: ${userId}`);
+
+    const event = await Event.findOne({ id: eventId });
+
+    if (!event) {
+      console.log(`[GET /api/questions/${eventId}] Event not found.`);
+      res.status(404).json({ error: 'Event not found' });
+      console.log(`[GET /api/questions/${eventId}] Response sent: 404 Not Found.`);
+      return;
+    }
+
+    console.log(`[GET /api/questions/${eventId}] Event found. Event details:`, event);
+
+    if (event.userId !== userId) {
+      console.log(`[GET /api/questions/${eventId}] Authorization failed. Event does not belong to user. EventUserId: ${event.userId}, UserId: ${userId}`);
+      res.status(403).json({ error: 'Not authorized for this event' });
+      console.log(`[GET /api/questions/${eventId}] Response sent: 403 Forbidden.`);
+      return;
+    }
+
+    const eventQuestions = await Question.find({ eventId });
+
+    console.log(`[GET /api/questions/${eventId}] Questions retrieved:`, eventQuestions);
+    res.json(eventQuestions);
+    console.log(`[GET /api/questions/${eventId}] Response sent: 200 OK.`);
+  } catch (error) {
+    console.error(`[GET /api/questions/${eventId}] Get questions error:`, error);
+    res.status(500).json({ error: 'Failed to retrieve questions' });
+    console.log(`[GET /api/questions/${eventId}] Response sent: 500 Internal Server Error.`);
+  }
+});
+
+
+// Get feedback for event
+app.get('/api/feedback/:eventId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const event = await Event.findOne({ id: eventId });
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    if (event.userId !== req.user.id) return res.status(403).json({ error: 'Not authorized for this event' });
+    
+    const eventFeedback = await Feedback.find({ eventId });
+    const eventQuestions = await Question.find({ eventId });
+    
+    const feedbackStats = eventQuestions.map(question => {
+      const questionFeedback = eventFeedback.filter(f => f.questionId === question.id);
+      const positiveCount = questionFeedback.filter(f => f.feedbackType === 'positive').length;
+      const negativeCount = questionFeedback.filter(f => f.feedbackType === 'negative').length;
+      const totalCount = questionFeedback.length;
       return {
         question: question.text,
         category: question.category,
