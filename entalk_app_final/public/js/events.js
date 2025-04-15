@@ -386,6 +386,7 @@ async function selectEvent(eventId) {
 
 // Generate questions for an event
 async function generateQuestions() {
+    e.preventDefault();
     const eventId = document.getElementById('event-select').value;
     const topic = document.getElementById('question-topic').value;
     const count = document.getElementById('question-count').value;
