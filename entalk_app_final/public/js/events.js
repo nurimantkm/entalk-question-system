@@ -75,6 +75,12 @@ async function init() {
         // Load categories and phases for dropdowns (will fall back to defaults if API fails)
         await loadCategoriesAndPhases();
         
+        // Add event listener for generate deck button
+        const generateDeckBtn = document.getElementById('generate-deck-btn');
+        if (generateDeckBtn) {
+            generateDeckBtn.addEventListener('click', generateDeck);
+        }
+
         console.log('Events page initialized successfully');
     } catch (error) {
         console.error('Error initializing page:', error);
@@ -94,11 +100,6 @@ function setupEventListeners() {
     const generateQuestionsForm = document.getElementById('generate-questions-form');
     if (generateQuestionsForm) {
         generateQuestionsForm.addEventListener('submit', generateQuestions);
-    }
-    
-    const generateDeckForm = document.getElementById('generate-deck-form');
-    if (generateDeckForm) {
-        generateDeckForm.addEventListener('submit', generateDeck);
     }
     
     const saveQuestionsBtn = document.getElementById('save-questions-btn');
@@ -427,6 +428,12 @@ async function generateQuestions() {
         currentQuestions = data.questions || [];
         displayGeneratedQuestions(currentQuestions);
         showAlert('Questions generated successfully', 'success');
+
+        // Make "Generate Deck" button visible
+        const generateDeckBtn = document.getElementById('generate-deck-btn');
+        if (generateDeckBtn) {
+            generateDeckBtn.style.display = 'block';
+        }
         
         console.log('Questions generated successfully:', currentQuestions.length);
     } catch (error) {
@@ -537,9 +544,7 @@ async function saveQuestions() {
 }
 
 // Generate a question deck for an event and location
-async function generateDeck(e) {
-    if (e) e.preventDefault();
-    
+async function generateDeck() {
     const eventSelect = document.getElementById('event-select');
     const locationSelect = document.getElementById('location-select');
     
@@ -725,52 +730,4 @@ async function displayFeedbackTable(questions) {
             row.innerHTML = `
                 <td>${question.text}</td>
                 <td>${question.category || 'N/A'}</td>
-                <td>${question.deckPhase || 'N/A'}</td>
-                <td>${stats.likes || 0}</td>
-                <td>${stats.dislikes || 0}</td>
-                <td>${stats.likeRate ? (stats.likeRate * 100).toFixed(1) + '%' : 'N/A'}</td>
-            `;
-            
-            tableBody.appendChild(row);
-        } catch (error) {
-            console.error(`Error getting feedback for question ${question.id}:`, error);
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${question.text}</td>
-                <td>${question.category || 'N/A'}</td>
-                <td>${question.deckPhase || 'N/A'}</td>
-                <td colspan="3">Error loading feedback data</td>
-            `;
-            tableBody.appendChild(row);
-        }
-    }
-}
-
-// Show an alert message
-function showAlert(message, type = 'danger') {
-    const alertContainer = document.getElementById('alert-container');
-    
-    if (!alertContainer) {
-        console.warn('Alert container not found');
-        console.log(type + ' alert:', message);
-        return;
-    }
-    
-    const alert = document.createElement('div');
-    alert.className = `alert alert-${type}`;
-    alert.textContent = message;
-    alertContainer.innerHTML = '';
-    alertContainer.appendChild(alert);
-    
-    if (type === 'success' || type === 'info') {
-        setTimeout(() => {
-            alert.remove();
-        }, 5000);
-    }
-}
-
-// Logout function
-function logout() {
-    localStorage.removeItem('token');
-    window.location.href = '/login.html';
-}
+                <td>${question.deckPhase || 'N/
