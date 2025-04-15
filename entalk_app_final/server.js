@@ -2,6 +2,9 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { generateNoveltyQuestions } = require('./openaiService');
+
+
 const path = require('path');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
