@@ -1,8 +1,8 @@
 // Load environment variables
 const path = require('path');
-const MONGO_URI = process.env.MONGO_URI || 'your_mongo_connection_string_here';
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''; // if provided, used in your OpenAI module
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://EntalkAdmin:Pamyk3gara@entalk-cluster.hc0qztn.mongodb.net/?retryWrites=true&w=majority&appName=entalk-cluster';
+const JWT_SECRET = process.env.JWT_SECRET || 'entalk_jwt_secret_key_production';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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'; // if provided, used in your OpenAI module
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -304,6 +304,29 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
   }
 });
 
+// Add Manual questions
+app.post('/api/questions/manual', authenticateToken, async (req, res) => {
+  try {
+    const { text, eventId, category, deckPhase } = req.body;
+
+    if (!text || !eventId || !category || !deckPhase) {
+      return res.status(400).json({ error: 'Text, eventId, category, and deckPhase are required' });
+    }
+
+    const newQuestion = new Question({
+      text,
+      eventId,
+      category,
+      deckPhase
+    });
+
+    const savedQuestion = await newQuestion.save();
+    res.status(201).json({ message: 'Question added successfully', question: savedQuestion });
+  } catch (error) {
+    console.error('Error adding question manually:', error);
+    res.status(500).json({ error: 'Failed to add question' });
+  }
+});
 // Generate question deck endpoint
 app.post('/api/decks/generate/:locationId', authenticateToken, async (req, res) => {
   try {
