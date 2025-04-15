@@ -284,7 +284,7 @@ app.post('/api/questions', authenticateToken, async (req, res) => {
     // Save questions to database
     const savedQuestions = await Promise.all(
       mockQuestions.map(async q => {
-        const question = new Question(q.text, eventId, q.category, q.deckPhase);
+        const question = new Question({ text: q.text, eventId, category: q.category, deckPhase: q.deckPhase });
         return await question.save();
       })
     );
