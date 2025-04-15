@@ -23,13 +23,12 @@ function initializeOpenAI(apiKey) {
 
 // Generate questions using OpenAI
 async function generateQuestions(topic, count, category, deckPhase) {
-  if (!openaiClient) {
-    console.error('OpenAI client not initialized. Please provide a valid API key.');
-    // Return improved mock data instead of throwing an error
-    return generateImprovedMockQuestions(topic, count, category, deckPhase);
-  }
-
+    if (!openaiClient) {
+        console.error('OpenAI client not initialized. Please provide a valid API key.');
+        return generateImprovedMockQuestions(topic, count, category, deckPhase);
+    }
   try {
+    return generateImprovedMockQuestions(topic, count, category, deckPhase);
     console.log(`Generating ${count} questions about ${topic} in category ${category} for phase ${deckPhase}`);
     
     const categoryDescription = getCategoryDescription(category);
@@ -334,6 +333,11 @@ async function generateNoveltyQuestions(count) {
     // Return improved mock data instead of throwing an error
     return generateImprovedMockNoveltyQuestions(count);
   }
+  if (!openaiClient) {
+    console.error('OpenAI client not initialized. Please provide a valid API key.');
+    // Return improved mock data instead of throwing an error
+    return generateImprovedMockNoveltyQuestions(count);
+  }
 
   try {
     console.log(`Generating ${count} novelty questions`);
@@ -399,7 +403,7 @@ Return only the questions as a JSON array of strings.`;
       isNovelty: true
     }));
   } catch (error) {
-    console.error('Error generating novelty questions with OpenAI:', error);
+    console.error('Error generating novelty questions with OpenAI:', error);// Updated logging to print full object
     // Return improved mock data instead of throwing an error
     return generateImprovedMockNoveltyQuestions(count);
   }
