@@ -1,43 +1,7 @@
 // questionService.js - Fixed version with circular dependency resolved
 
-const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
+const { Question, Feedback, Deck } = require('./models'); // Import models
 const openai = require('openai');
-
-// Assuming these are your Mongoose models
-const Question = mongoose.model('Question', new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  text: String,
-  eventId: String,
-  category: String,
-  deckPhase: String,
-  createdAt: { type: Date, default: Date.now },
-  performance: {
-    views: { type: Number, default: 0 },
-    likes: { type: Number, default: 0 },
-    dislikes: { type: Number, default: 0 },
-    score: { type: Number, default: 0 } // Add a score field
-  },
-  lastUsed: [{ locationId: String, date: Date }], // Track last used per location
-  isNovelty: { type: Boolean, default: false }
-}));
-
-const Feedback = mongoose.model('Feedback', new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  questionId: String,
-  eventId: String,
-  locationId: String,
-  feedbackType: String,
-  userId: { type: String, default: null },
-  createdAt: { type: Date, default: Date.now }
-}));
-
-const Deck = mongoose.model('Deck', new mongoose.Schema({
-  accessCode: String,
-  eventId: String,
-  questions: [{ type: String }], // Store question IDs
-  date: { type: Date, default: Date.now }
-}));
 
 // Helper function to generate a random access code
 function generateAccessCode() {
