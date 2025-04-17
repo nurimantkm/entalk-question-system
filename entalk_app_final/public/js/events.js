@@ -568,7 +568,7 @@ async function generateDeck(e) {
         console.log('Fetching event details...');
         showAlert('Generating deck... This may take a moment.', 'info');
 
-        const eventResponse = await fetch(`/api/events/${eventId}`, {
+        const eventResponse = await fetch(`/api/events/${eventId}`, {  // Keep this to get event details
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -588,7 +588,7 @@ async function generateDeck(e) {
         }
 
         console.log('Generating deck...');
-        const response = await fetch(`/api/decks/generate/${locationId}`, {
+        const response = await fetch(`/api/decks/generate/${locationId}`, {  // Use the correct endpoint
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
