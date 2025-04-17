@@ -1,9 +1,10 @@
 // participant.js - Handles the participant interface for answering questions
+
 const { v4: uuidv4 } = require('uuid');
 
 document.addEventListener('DOMContentLoaded', function() {
-    
     // Only initialize if we're on the participant page
+
     if (window.location.pathname.includes('participant.html')) {
         init();
     }
@@ -235,13 +236,11 @@ function setupSwipe() {
         isDragging = false;
         startX = null;
         startY = null;
-        moveX = null;
-        moveY = null;
-    });
+    }
 }
 
 // Function to get or create a userId
-function getOrCreateUserId() {
+function getOrCreateUserId(){
     let userId = localStorage.getItem('participantId');
     if (!userId) {
         userId = uuidv4();
@@ -249,8 +248,7 @@ function getOrCreateUserId() {
         isDragging = false;
         startX = null;
         startY = null;
-        moveX = null;
-        moveY = null;
+
     });
 }
 
