@@ -543,38 +543,51 @@ async function saveQuestions() {
     }
 }
 
-// Generate a question deck for an event and location
-async function generateDeck(e) { 
+// Generate a question deck for an event
+async function generateDeck(e) {
     e.preventDefault();
 
     const eventSelect = document.getElementById('deck-event-select');
-    const locationSelect = document.getElementById('deck-location-select');
 
-    if (!eventSelect || !locationSelect) {
-        console.error('One or more form elements not found');
+    if (!eventSelect) {
+        console.error('Event select element not found');
         showAlert('Form error: Missing elements', 'danger');
         return;
     }
 
     const eventId = eventSelect.value;
-    const locationId = locationSelect.value;
 
     if (!eventId || eventId === '') {
         showAlert('Please select an event', 'danger');
         return;
     }
 
-    if (!locationId || locationId === '') {
-        showAlert('Please select a location', 'danger');
-        return;
-    }
-    
     console.log('Selected event ID:', eventId);
-    console.log('Selected location ID:', locationId);
-    
+
     try {
+        console.log('Fetching event details...');
+        showAlert('Generating deck... This may take a moment.', 'info');
+
+        const eventResponse = await fetch(`/api/events/${eventId}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (!eventResponse.ok) {
+            throw new Error('Failed to fetch event details');
+        }
+
+        const event = await eventResponse.json();
+        const locationId = event.locationId;  // Assuming event object has locationId
+
+        console.log('Location ID from event:', locationId);
+
+        if (!locationId) {
+            throw new Error('Location ID not found for this event');
+        }
+
         console.log('Generating deck...');
-        showAlert('Generating deck... This may take a moment.', 'info');        
         const response = await fetch(`/api/decks/generate/${locationId}`, {
             method: 'POST',
             headers: {
@@ -585,12 +598,20 @@ async function generateDeck(e) {
                 eventId
             })
         });
-        const deck = await response.json();        displayDeckInfo(deck);
+
+        if (!response.ok) {
+            const errorBody = await response.json();
+            throw new Error(errorBody.message || 'Failed to generate deck');
+        }
+
+        const deck = await response.json();
+        displayDeckInfo(deck);
         showAlert('Deck generated successfully', 'success');
         console.log('Deck generated successfully:', deck.accessCode);
+
     } catch (error) {
         console.error('Error generating deck:', error);
-        showAlert('Failed to generate deck', 'danger');
+        showAlert(`Failed to generate deck: ${error.message}`, 'danger');
     } finally {
         console.log('Deck generation attempt complete.');
     }
