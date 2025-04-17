@@ -85,33 +85,6 @@ async function loadQuestions() {
         console.error('Error loading questions:', error);
         showMessage('Error loading questions. Please try again.', 'error');
     }
-}`);
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to load questions');
-        }
-        
-        console.log("Received data:", data);
-        questions = data.questions || [];
-        deckId = data.id;
-        locationId = data.locationId;
-        eventId = data.eventId;
-        
-        if (questions.length === 0) {
-            showMessage('No questions available for this event.', 'error');
-            return;
-        }
-        
-        // Display first question
-        displayQuestion(0);
-        
-        // Update progress
-        updateProgress();
-    } catch (error) {
-        console.error('Error loading questions:', error);
-        showMessage('Error loading questions. Please try again.', 'error');
-    }
 }
 
 // Display a question
@@ -142,7 +115,7 @@ function displayQuestion(index) {
     updateProgress();
 }
 
-// Setup swipe functionality (unchanged)...
+// Setup swipe functionality
 function setupSwipe() {
     /* existing swipe code unchanged */
 }
@@ -183,22 +156,76 @@ async function handleFeedback(isLike) {
         const questionCard = document.getElementById('question-card');
         if (questionCard) {
             questionCard.style.transform = isLike
-    ? 'translateX(1000px) rotate(45deg)'
-    : 'translateX(-1000px) rotate(-45deg)';
+                ? 'translateX(1000px) rotate(45deg)'
+                : 'translateX(-1000px) rotate(-45deg)';
+        }
+        
+        // Move to next question after animation
+        setTimeout(() => {
+            displayQuestion(currentQuestionIndex + 1);
+            resetCardPosition();
+        }, 300);
+    } catch (error) {
+        console.error('Error handling feedback:', error);
+        showMessage('Error recording feedback. Please try again.', 'error');
     }
 }
 
 // Update progress indicator
 function updateProgress() {
-    /* unchanged */
+    const progressElement = document.getElementById('progress');
+    if (progressElement && questions.length > 0) {
+        progressElement.textContent = `${currentQuestionIndex + 1}/${questions.length}`;
+    }
 }
 
 // Show completion message
 function showCompletion() {
-    /* unchanged */
+    const questionContainer = document.getElementById('question-container');
+    if (questionContainer) {
+        questionContainer.innerHTML = `
+            <div class="completion-message">
+                <h2>All Done!</h2>
+                <p>You've answered all the questions.</p>
+                <p>Thank you for participating!</p>
+            </div>
+        `;
+    }
 }
 
 // Show message to user
 function showMessage(message, type = 'error') {
-    /* unchanged */
+    const messageElement = document.getElementById('message');
+    if (messageElement) {
+        messageElement.textContent = message;
+        messageElement.className = type;
+        messageElement.style.display = 'block';
+        
+        // Hide after 5 seconds
+        setTimeout(() => {
+            messageElement.style.display = 'none';
+        }, 5000);
+    }
+}
+
+// Record feedback to server
+async function recordFeedback(question, isLike) {
+    const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            questionId: question.id,
+            deckId,
+            locationId,
+            eventId,
+            isLike,
+            timestamp: new Date().toISOString()
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error('Failed to record feedback');
+    }
 }
