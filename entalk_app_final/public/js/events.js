@@ -568,7 +568,7 @@ async function generateDeck(e) {
         console.log('Fetching event details...');
         showAlert('Generating deck... This may take a moment.', 'info');
 
-        const eventResponse = await fetch(`/api/events/${eventId}`, {  // Keep this to get event details
+        const eventResponse = await fetch(`/api/events/${eventId}`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -579,7 +579,7 @@ async function generateDeck(e) {
         }
 
         const event = await eventResponse.json();
-        const locationId = event.locationId;  // Assuming event object has locationId
+        const locationId = event.locationId;
 
         console.log('Location ID from event:', locationId);
 
@@ -588,20 +588,18 @@ async function generateDeck(e) {
         }
 
         console.log('Generating deck...');
-        const response = await fetch(`/api/decks/generate/${locationId}`, {  // Use the correct endpoint
+        const response = await fetch(`/api/decks/generate/${locationId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({
-                eventId
-            })
+            body: JSON.stringify({ eventId })
         });
 
         if (!response.ok) {
-            const errorBody = await response.json();
-            throw new Error(errorBody.message || 'Failed to generate deck');
+            const errorText = await response.text();  // FIXED: safe parsing
+            throw new Error(errorText || 'Failed to generate deck');
         }
 
         const deck = await response.json();
