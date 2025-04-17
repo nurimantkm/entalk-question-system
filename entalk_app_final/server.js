@@ -55,6 +55,12 @@ const questionSchema = new mongoose.Schema({
   category: String,
   deckPhase: String,
   createdAt: { type: Date, default: Date.now }
+  ,
+  performance: {
+    views: { type: Number, default: 0 },
+    likes: { type: Number, default: 0 },
+    dislikes: { type: Number, default: 0 }
+  }
 });
 const Question = mongoose.model('Question', questionSchema);
 
@@ -64,7 +70,7 @@ const feedbackSchema = new mongoose.Schema({
   eventId: String,
   locationId: String,
   feedbackType: String,
-  userId: String,
+  userId: {type: String, default: null},
   createdAt: { type: Date, default: Date.now }
 });
 const Feedback = mongoose.model('Feedback', feedbackSchema);
@@ -377,14 +383,26 @@ app.get('/api/decks/:accessCode', async (req, res) => {
 app.post('/api/feedback', async (req, res) => {
   try {
     const { questionId, eventId, locationId, feedbackType, userId } = req.body;
-    if (!questionId || !eventId || !locationId || !feedbackType) {
-      return res.status(400).json({ error: 'Question ID, event ID, location ID, and feedback type are required' });
+     if (!questionId || !eventId || !locationId || !feedbackType) {
+      return res.status(400).json({ error: 'Question ID, event ID, location ID, and feedback are required' });
     }
-    
-    const newFeedback = new Feedback(questionId, eventId, locationId, feedbackType, userId);
+
+    // Create new feedback record
+    const newFeedback = new Feedback({ questionId, eventId, locationId, feedbackType, userId }); // Assuming userId is optional for now
     await newFeedback.save();
-    
+
+     // Update question performance in the database
+     const question = await Question.findOne({ id: questionId });
+     if (question) {
+       if (feedbackType === 'like') {
+         question.performance.likes++;
+       } else if (feedbackType === 'dislike') {
+         question.performance.dislikes++;
+       }
+       await question.save();
+     }
     res.status(201).json({ message: 'Feedback recorded successfully', feedback: newFeedback });
+    
   } catch (error) {
     console.error('Record feedback error:', error);
     res.status(500).json({ error: 'Failed to record feedback' });
@@ -501,12 +519,24 @@ app.get('/api/feedback/:eventId', authenticateToken, async (req, res) => {
 app.get('/api/feedback/stats/:questionId', authenticateToken, async (req, res) => {
   try {
     const { questionId } = req.params;
-    
-    // Use the getFeedbackStats function from questionService.js
-    const stats = await getFeedbackStats(questionId);
-    
+
+    const question = await Question.findOne({ id: questionId });
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    const stats = {
+      questionId,
+      views: question.performance.views, // Assuming you have a views property
+      likes: question.performance.likes,
+      dislikes: question.performance.dislikes,
+      likeRate: question.performance.views > 0 ?
+        (question.performance.likes / question.performance.views) : 0,
+      score: question.performance.score // Assuming you have a score property
+    };
+
     res.json(stats);
-  } catch (error) {
+    } catch (error) {
     console.error('Get feedback stats error:', error);
     res.status(500).json({ error: 'Failed to retrieve feedback stats' });
   }
