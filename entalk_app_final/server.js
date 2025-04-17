@@ -130,6 +130,21 @@ app.get('/api/events', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     console.log(`Getting events for user: ${userId}`);
     const userEvents = await Event.find({ userId });
+
+// Get a single event by ID
+app.get('/api/events/:id', authenticateToken, async (req, res) => {
+  try {
+    const ev = await Event.findOne({ id: req.params.id });
+    if (!ev) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    res.json(ev);
+  } catch (err) {
+    console.error('Error fetching event:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
     console.log(`Found ${userEvents.length} events for user ${userId}`);
     res.json(userEvents);
   } catch (error) {
