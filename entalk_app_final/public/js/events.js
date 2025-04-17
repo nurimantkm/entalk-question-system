@@ -602,10 +602,17 @@ async function generateDeck(e) {
             throw new Error(errorText || 'Failed to generate deck');
         }
 
-        const deck = await response.json();
-        displayDeckInfo(deck);
-        showAlert('Deck generated successfully', 'success');
-        console.log('Deck generated successfully:', deck.accessCode);
+        const contentType = response.headers.get('content-type') || '';
+if (!contentType.includes('application/json')) {
+    const errorHtml = await response.text();
+    console.error('Received non-JSON response:', errorHtml);
+    throw new Error('Invalid server response (not JSON)');
+}
+
+const deck = await response.json();
+displayDeckInfo(deck);
+showAlert('Deck generated successfully', 'success');
+console.log('Deck generated successfully:', deck.accessCode);
 
     } catch (error) {
         console.error('Error generating deck:', error);
