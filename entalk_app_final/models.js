@@ -47,7 +47,7 @@ const feedbackSchema = new mongoose.Schema({
   questionId:   { type: String, required: true },
   eventId:      { type: String, required: true },
   locationId:   { type: String, required: true },
-  feedbackType: { type: String, required: true },
+  feedbackType: { type: String, required: true }, // 'like' or 'dislike'
   userId:       { type: String },
   date:         { type: Date, default: Date.now }
 });
