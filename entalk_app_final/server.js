@@ -130,6 +130,13 @@ app.get('/api/events', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     console.log(`Getting events for user: ${userId}`);
     const userEvents = await Event.find({ userId });
+    console.log(`Found ${userEvents.length} events for user ${userId}`);
+    res.json(userEvents);
+  } catch (error) {
+    console.error('Get events error:', error);
+    res.status(500).json({ error: 'Failed to retrieve events' });
+  }
+});
 
 // Get a single event by ID
 app.get('/api/events/:id', authenticateToken, async (req, res) => {
@@ -145,13 +152,6 @@ app.get('/api/events/:id', authenticateToken, async (req, res) => {
   }
 });
 
-    console.log(`Found ${userEvents.length} events for user ${userId}`);
-    res.json(userEvents);
-  } catch (error) {
-    console.error('Get events error:', error);
-    res.status(500).json({ error: 'Failed to retrieve events' });
-  }
-});
 
 // Get all locations (initialize defaults if needed)
 app.get('/api/locations', async (req, res) => {
