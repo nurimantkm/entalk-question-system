@@ -182,52 +182,9 @@ async function handleFeedback(isLike) {
         // Animate card off screen
         const questionCard = document.getElementById('question-card');
         if (questionCard) {
-            questionCard.style.transform = `translateX(${isLike ? '1000px' : '-1000px'}) rotate(${isLike ? '45deg' : '-45deg'})`;
-            setTimeout(() => {
-                displayQuestion(currentQuestionIndex + 1);
-                resetCardPosition();
-            }, 300);
-        } else {
-            displayQuestion(currentQuestionIndex + 1);
-        }
-    } catch (error) {
-        console.error('Error handling feedback:', error);
-        showMessage('Error saving your response. Please try again.', 'error');
-    }
-}
-
-// Record feedback to server and fetch updated stats
-async function recordFeedback(question, isLike) {
-    try {
-        const payload = {
-            questionId: question._id || question.id,
-            eventId,
-            locationId,
-            feedbackType: isLike ? 'like' : 'dislike'
-        };
-        console.log('Sending feedback to server:', payload);
-        
-        const response = await fetch('/api/feedback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to record feedback');
-        }
-        console.log('Feedback recorded successfully:', data);
-        
-        // Fetch updated stats for this question
-        const statsRes = await fetch(`/api/feedback/stats/${payload.questionId}`);
-        if (statsRes.ok) {
-            const stats = await statsRes.json();
-            console.log('Updated stats for question:', stats);
-            // TODO: update UI with new stats if desired
-        }
-    } catch (error) {
-        console.error('Error recording feedback:', error);
-        showMessage('Could not record feedback: ' + error.message, 'error');
+            questionCard.style.transform = isLike
+    ? 'translateX(1000px) rotate(45deg)'
+    : 'translateX(-1000px) rotate(-45deg)';
     }
 }
 
