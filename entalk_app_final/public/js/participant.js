@@ -182,7 +182,7 @@ async function handleFeedback(isLike) {
         // Animate card off screen
         const questionCard = document.getElementById('question-card');
         if (questionCard) {
-            questionCard.style.transform = `translateX(${isLike ? 1000 : -1000}px) rotate(${isLike ? 45 : -45}deg)`;
+            questionCard.style.transform = `translateX(${isLike ? '1000px' : '-1000px'}) rotate(${isLike ? '45deg' : '-45deg'})`;
             setTimeout(() => {
                 displayQuestion(currentQuestionIndex + 1);
                 resetCardPosition();
