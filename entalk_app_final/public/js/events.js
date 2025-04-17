@@ -98,7 +98,7 @@ function setupEventListeners() {
     
     
     // Add event listener for generate deck button
-        const generateDeckBtn = document.getElementById('generate-deck-btn');
+    const generateDeckBtn = document.getElementById('generate-deck-btn');
         if (generateDeckBtn) {
             generateDeckBtn.addEventListener('click', generateDeck);
         }
@@ -270,7 +270,7 @@ async function loadEvents() {
             button.addEventListener('click', () => selectEvent(button.dataset.id));
         });
         
-        const eventSelects = document.querySelectorAll('#event-select, #feedback-event-select');
+        const eventSelects = document.querySelectorAll('#event-select, #feedback-event-select, #deck-event-select');
         eventSelects.forEach(select => {
             if (select) {
                 populateDropdown(select, events.map(e => e.name), events.map(e => e.id));
@@ -363,14 +363,9 @@ async function selectEvent(eventId) {
         });
         
         const questionsSection = document.getElementById('questions-section');
-        const deckSection = document.getElementById('deck-section');
         
         if (questionsSection) {
             questionsSection.style.display = 'block';
-        }
-        
-        if (deckSection) {
-            deckSection.style.display = 'block';
         }
         
         console.log('Event selected successfully');
@@ -548,30 +543,33 @@ async function saveQuestions() {
 }
 
 // Generate a question deck for an event and location
-async function generateDeck(e) {
-    if (e) e.preventDefault();
-    
-    const eventSelect = document.getElementById('event-select');
-    const locationSelect = document.getElementById('location-select');
-    
+async function generateDeck(e) { 
+    e.preventDefault();
+
+    const eventSelect = document.getElementById('deck-event-select');
+    const locationSelect = document.getElementById('deck-location-select');
+
     if (!eventSelect || !locationSelect) {
         console.error('One or more form elements not found');
         showAlert('Form error: Missing elements', 'danger');
         return;
     }
-    
+
     const eventId = eventSelect.value;
     const locationId = locationSelect.value;
-    
-    if (!eventId) {
+
+    if (!eventId || eventId === '') {
         showAlert('Please select an event', 'danger');
         return;
     }
-    
-    if (!locationId) {
+
+    if (!locationId || locationId === '') {
         showAlert('Please select a location', 'danger');
         return;
     }
+    
+    console.log('Selected event ID:', eventId);
+    console.log('Selected location ID:', locationId);
     
     try {
         console.log('Generating deck...');
@@ -590,15 +588,18 @@ async function generateDeck(e) {
         
         if (!response.ok) {
             throw new Error('Failed to generate deck');
+
         }
         
         const deck = await response.json();
         displayDeckInfo(deck);
         showAlert('Deck generated successfully', 'success');
-        
         console.log('Deck generated successfully:', deck.accessCode);
     } catch (error) {
         console.error('Error generating deck:', error);
+        showAlert('Failed to generate deck', 'danger');
+    } finally {
+        console.log('Deck generation attempt complete.');
         showAlert('Failed to generate deck. Please try again later.', 'danger');
     }
 }
