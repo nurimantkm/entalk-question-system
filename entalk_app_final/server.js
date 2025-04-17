@@ -1,3 +1,4 @@
+// server.js
 // Load environment variables
 const path = require('path');
 const express = require('express');
@@ -13,6 +14,9 @@ const { generateQuestionDeck, getFeedbackStats } = require('./questionService');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
+// Import Mongoose models
+const { User, Event, Question, Feedback, Location, Deck } = require('./models');
+
 if (OPENAI_API_KEY) {
   console.log('OpenAI API key initialized.');
 } else {
@@ -24,70 +28,6 @@ if (OPENAI_API_KEY) {
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected!'))
   .catch((err) => console.error('MongoDB connection error:', err));
-
-// Define Mongoose Schemas and Models
-
-const userSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  name: String,
-  email: { type: String, unique: true },
-  password: String,
-  createdAt: { type: Date, default: Date.now }
-});
-const User = mongoose.model('User', userSchema);
-
-const eventSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  name: String,
-  userId: String,
-  date: { type: Date, default: Date.now },
-  capacity: { type: Number, default: 20 },
-  description: String,
-  locationId: String,
-  createdAt: { type: Date, default: Date.now }
-});
-const Event = mongoose.model('Event', eventSchema);
-
-const questionSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  text: String,
-  eventId: String,
-  category: String,
-  deckPhase: String,
-  createdAt: { type: Date, default: Date.now }
-  ,
-  performance: {
-    views: { type: Number, default: 0 },
-    likes: { type: Number, default: 0 },
-    dislikes: { type: Number, default: 0 }
-  }
-});
-const Question = mongoose.model('Question', questionSchema);
-
-const feedbackSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  questionId: String,
-  eventId: String,
-  locationId: String,
-  feedbackType: String,
-  userId: {type: String, default: null},
-  createdAt: { type: Date, default: Date.now }
-});
-const Feedback = mongoose.model('Feedback', feedbackSchema);
-
-const locationSchema = new mongoose.Schema({
-  id: String,
-  name: String
-});
-const Location = mongoose.model('Location', locationSchema);
-
-const deckSchema = new mongoose.Schema({
-  accessCode: String,
-  eventId: String,
-  questions: [questionSchema],
-  date: { type: Date, default: Date.now }
-});
-const Deck = mongoose.model('Deck', deckSchema);
 
 // Initialize Express app
 
@@ -348,21 +288,12 @@ app.post('/api/decks/generate/:locationId', authenticateToken, async (req, res) 
     if (event.userId !== req.user.id) return res.status(403).json({ error: 'Not authorized for this event' });
     
     // Generate deck using questionService
-    const deck = await generateQuestionDeck(locationId, eventId); // Changed here
+    const deck = await generateQuestionDeck(locationId, eventId);
 
-    // Save the generated deck
-    const newDeck = new Deck({ // Changed here
-      accessCode: deck.accessCode, // Changed here
-      eventId,
-      questions: deck.questions, // Changed here
-      date: new Date().toISOString()
-    });
-    await newDeck.save(); // Changed here
-
-    res.json(newDeck); // Changed here
+    res.json(deck);
   } catch (error) {
     console.error('Generate deck error:', error);
-    res.status(500).json({ error: 'Failed to generate deck' });
+    res.status(500).json({ error: 'Failed to generate deck: ' + error.message }); // Include error message
   }
 });
 
@@ -370,7 +301,7 @@ app.post('/api/decks/generate/:locationId', authenticateToken, async (req, res) 
 app.get('/api/decks/:accessCode', async (req, res) => {
   try {
     const { accessCode } = req.params;
-    const deck = await Deck.findOne({ accessCode });
+    const deck = await Deck.findOne({ accessCode }).populate('questions');
     if (!deck) return res.status(404).json({ error: 'Deck not found' });
     res.json(deck);
   } catch (error) {
@@ -525,15 +456,7 @@ app.get('/api/feedback/stats/:questionId', authenticateToken, async (req, res) =
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    const stats = {
-      questionId,
-      views: question.performance.views, // Assuming you have a views property
-      likes: question.performance.likes,
-      dislikes: question.performance.dislikes,
-      likeRate: question.performance.views > 0 ?
-        (question.performance.likes / question.performance.views) : 0,
-      score: question.performance.score // Assuming you have a score property
-    };
+    const stats = await getFeedbackStats(questionId);
 
     res.json(stats);
     } catch (error) {
