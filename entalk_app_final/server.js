@@ -1,10 +1,10 @@
 // Load environment variables
 const path = require('path');
+const express = require('express');
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://EntalkAdmin:Pamyk3gara@entalk-cluster.hc0qztn.mongodb.net/?retryWrites=true&w=majority&appName=entalk-cluster';
 const JWT_SECRET = process.env.JWT_SECRET || 'entalk_jwt_secret_key_production';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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'; // if provided, used in your OpenAI module
 const app = express();
-const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateNoveltyQuestions } = require('./openaiService');
