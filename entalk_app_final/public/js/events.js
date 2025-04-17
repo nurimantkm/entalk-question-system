@@ -569,7 +569,8 @@ async function generateDeck(e) {
     try {
         console.log('Generating deck...');
         showAlert('Generating deck... This may take a moment.', 'info');
-        
+                
+        const response = await fetch(`/api/decks/generate/${locationId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -579,9 +580,7 @@ async function generateDeck(e) {
                 eventId
             })
         });
-            
-            const response = await fetch(`/api/decks/generate/${locationId}`, {
-            headers: {
+        
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -595,7 +594,6 @@ async function generateDeck(e) {
         showAlert('Failed to generate deck', 'danger');
     } finally {
         console.log('Deck generation attempt complete.');
-        showAlert('Failed to generate deck. Please try again later.', 'danger');
     }
 }
 
