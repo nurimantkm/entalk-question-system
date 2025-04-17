@@ -45,7 +45,47 @@ async function init() {
 async function loadQuestions() {
     try {
         console.log("Loading questions with access code:", accessCode);
-        const response = await fetch(`/api/decks/${accessCode}`);
+        const deckRes = await fetch(`/api/decks/${accessCode}`);
+        const deckData = await deckRes.json();
+
+        if (!deckRes.ok) {
+            throw new Error(deckData.error || 'Failed to load questions');
+        }
+
+        console.log("Received deck data:", deckData);
+        questions = deckData.questions || [];
+        deckId = deckData.id;
+        eventId = deckData.eventId;
+
+        // Fetch event details to get locationId
+        try {
+            const eventRes = await fetch(`/api/events/${eventId}`);
+            const eventData = await eventRes.json();
+            if (eventRes.ok && eventData.locationId) {
+                locationId = eventData.locationId;
+                console.log('Resolved locationId from event:', locationId);
+            } else {
+                console.warn('Could not fetch locationId from event');
+            }
+        } catch (err) {
+            console.warn('Error fetching event details for locationId:', err);
+        }
+
+        if (questions.length === 0) {
+            showMessage('No questions available for this event.', 'error');
+            return;
+        }
+
+        // Display first question
+        displayQuestion(0);
+
+        // Update progress
+        updateProgress();
+    } catch (error) {
+        console.error('Error loading questions:', error);
+        showMessage('Error loading questions. Please try again.', 'error');
+    }
+}`);
         const data = await response.json();
         
         if (!response.ok) {
