@@ -1,119 +1,86 @@
-// models.js - Mongoose models for Entalk Question System
+// models.js
 
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
+// User schema
 const userSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  name: String,
-  email: String,
-  password: String,
-  date: { type: Date, default: Date.now }
+  id:        { type: String, default: uuidv4 },
+  name:      String,
+  email:     String,
+  password:  String,
+  date:      { type: Date, default: Date.now }
 });
 
+// Event schema
 const eventSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  name: String,
+  id:        { type: String, default: uuidv4 },
+  name:      String,
+  userId:    String,
+  date:      Date,
+  capacity:  Number,
   description: String,
-  date: Date,
-  userId: String,
-  createdAt: { type: Date, default: Date.now }
+  locationId: String
 });
 
+// Question schema
 const questionSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  text: String,
-  eventId: String,
-  category: String,
-  deckPhase: String,
+  id:           { type: String, default: uuidv4 },
+  text:         String,
+  eventId:      String,
+  category:     String,
+  deckPhase:    String,
   creationDate: { type: Date, default: Date.now },
   usageHistory: [{ locationId: String, date: Date }],
   performance: {
-    views: { type: Number, default: 0 },
-    likes: { type: Number, default: 0 },
+    views:    { type: Number, default: 0 },
+    likes:    { type: Number, default: 0 },
     dislikes: { type: Number, default: 0 },
-    score: { type: Number, default: 0 }
+    score:    { type: Number, default: 0 }
   },
-  isNovelty: { type: Boolean, default: false }
+  isNovelty:   { type: Boolean, default: false }
 });
 
-// Add methods to the question schema
-questionSchema.methods.updatePerformance = function(feedback) {
-  this.performance.views++;
-  if (feedback === 'like') {
-    this.performance.likes++;
-  } else if (feedback === 'dislike') {
-    this.performance.dislikes++;
-  }
-  this.calculateScore();
-};
-
-questionSchema.methods.calculateScore = function() {
-  const likeRate = this.performance.views > 0 ? 
-    this.performance.likes / this.performance.views : 0;
-  const ageInDays = (new Date() - new Date(this.creationDate)) / (1000 * 60 * 60 * 24);
-  const freshnessBoost = Math.max(0, 1 - (ageInDays / 30));
-  let score = (likeRate * 0.7) + (freshnessBoost * 0.3);
-  score += Math.random() * 0.1;
-  this.performance.score = score;
-  return score;
-};
-
-questionSchema.methods.recordUsage = function(locationId) {
-  this.usageHistory.push({
-    locationId,
-    date: new Date()
-  });
-};
-
-questionSchema.methods.wasUsedRecently = function(locationId, days = 28) {
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - days);
-  
-  return this.usageHistory.some(usage => {
-    return usage.locationId === locationId && 
-           usage.date > cutoffDate;
-  });
-};
-
+// Feedback schema
 const feedbackSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
+  id:         { type: String, default: uuidv4 },
   questionId: String,
-  eventId: String,
+  eventId:    String,
   locationId: String,
-  feedback: String, // 'like' or 'dislike'
-  userId: { type: String, default: null },
-  date: { type: Date, default: Date.now }
+  feedbackType: String, // e.g. 'like' or 'dislike'
+  userId:     String,
+  date:       { type: Date, default: Date.now }
 });
 
+// Location schema
 const locationSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  name: String,
-  dayOfWeek: Number
+  id:   { type: String, default: uuidv4 },
+  name: String
 });
 
-const questionDeckSchema = new mongoose.Schema({
-  id: { type: String, default: uuidv4 },
-  eventId: String,
-  locationId: String,
-  date: { type: Date, default: Date.now },
-  questions: [{ type: String }], // Array of question IDs
+// Deck schema (renamed to Deck)
+const deckSchema = new mongoose.Schema({
+  id:         { type: String, default: uuidv4 },
   accessCode: String,
-  active: { type: Boolean, default: true }
+  eventId:    String,
+  questions:  [String],   // array of question IDs
+  date:       { type: Date, default: Date.now }
 });
 
-const User = mongoose.model('User', userSchema);
-const Event = mongoose.model('Event', eventSchema);
+// Model registrations
+const User     = mongoose.model('User', userSchema);
+const Event    = mongoose.model('Event', eventSchema);
 const Question = mongoose.model('Question', questionSchema);
 const Feedback = mongoose.model('Feedback', feedbackSchema);
 const Location = mongoose.model('Location', locationSchema);
-const QuestionDeck = mongoose.model('QuestionDeck', questionDeckSchema);
+const Deck     = mongoose.model('Deck', deckSchema);
 
+// Export all models, including Deck
 module.exports = {
   User,
   Event,
   Question,
   Feedback,
   Location,
-  QuestionDeck
+  Deck
 };
