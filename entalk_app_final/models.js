@@ -3,7 +3,8 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
-// User schema\const userSchema = new mongoose.Schema({
+// User schema
+const userSchema = new mongoose.Schema({
   id:       { type: String, default: uuidv4 },
   name:     { type: String, required: true },
   email:    { type: String, required: true, unique: true },
@@ -46,7 +47,7 @@ const feedbackSchema = new mongoose.Schema({
   questionId:   { type: String, required: true },
   eventId:      { type: String, required: true },
   locationId:   { type: String, required: true },
-  feedbackType: { type: String, required: true }, // 'like' or 'dislike'
+  feedbackType: { type: String, required: true },
   userId:       { type: String },
   date:         { type: Date, default: Date.now }
 });
