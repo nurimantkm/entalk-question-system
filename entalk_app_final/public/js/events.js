@@ -568,7 +568,7 @@ async function generateDeck(e) {
         console.log('Fetching event details...');
         showAlert('Generating deck... This may take a moment.', 'info');
 
-        const eventResponse = await fetch(`/api/events/${eventId}`, {  // Keep this to get event details
+        const eventResponse = await fetch(`/api/events/${eventId}`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -579,7 +579,7 @@ async function generateDeck(e) {
         }
 
         const event = await eventResponse.json();
-        const locationId = event.locationId;  // Assuming event object has locationId
+        const locationId = event.locationId;
 
         console.log('Location ID from event:', locationId);
 
@@ -608,6 +608,58 @@ async function generateDeck(e) {
         displayDeckInfo(deck);
         showAlert('Deck generated successfully', 'success');
         console.log('Deck generated successfully:', deck.accessCode);
+
+    } catch (error) {
+        console.error('Error generating deck:', error);
+        showAlert(`Failed to generate deck: ${error.message}`, 'danger');
+    } finally {
+        console.log('Deck generation attempt complete.');
+    }
+}
+async function generateDeck(e) {
+    e.preventDefault();
+
+    const eventSelect = document.getElementById('deck-event-select');
+
+    if (!eventSelect) {
+        console.error('Event select element not found');
+        showAlert('Form error: Missing elements', 'danger');
+        return;
+    }
+
+    const eventId = eventSelect.value;
+
+    if (!eventId || eventId === '') {
+        showAlert('Please select an event', 'danger');
+        return;
+    }
+
+    console.log('Selected event ID:', eventId);
+
+    try {
+        console.log('Fetching event details...');
+        showAlert('Generating deck... This may take a moment.', 'info');
+
+        const eventResponse = await fetch(`/api/events/${eventId}`, {  // Keep this to get event details
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (!eventResponse.ok) {
+            throw new Error('Failed to fetch event details');
+        }
+
+        const event = await eventResponse.json();
+        const locationId = event.locationId;  // Assuming event object has locationId
+
+        console.log('Location ID from event:', locationId);
+
+        if (!locationId) {
+            throw new Error('Location ID not found for this event');
+        }
+
+        console.log('Generating deck...');
         const response = await fetch(`/api/decks/generate/${locationId}`, {  // Use the correct endpoint
             method: 'POST',
             headers: {
