@@ -364,11 +364,6 @@ async function selectEvent(eventId) {
         
         const questionsSection = document.getElementById('questions-section');
         
-        if (questionsSection) {
-            questionsSection.style.display = 'block';
-        }
-        
-        console.log('Event selected successfully');
     } catch (error) {
         console.error('Error selecting event:', error);
         showAlert('Failed to select event. Please try again.', 'danger');
@@ -575,7 +570,6 @@ async function generateDeck(e) {
         console.log('Generating deck...');
         showAlert('Generating deck... This may take a moment.', 'info');
         
-        const response = await fetch(`/api/decks/generate/${locationId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -585,10 +579,11 @@ async function generateDeck(e) {
                 eventId
             })
         });
-        
-        if (!response.ok) {
-            throw new Error('Failed to generate deck');
-
+            
+            const response = await fetch(`/api/decks/generate/${locationId}`, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
         
         const deck = await response.json();
