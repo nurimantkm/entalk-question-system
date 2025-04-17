@@ -3,33 +3,32 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
-// User schema
-theconst userSchema = new mongoose.Schema({
-  id:        { type: String, default: uuidv4 },
-  name:      String,
-  email:     String,
-  password:  String,
-  date:      { type: Date, default: Date.now }
+// User schema\const userSchema = new mongoose.Schema({
+  id:       { type: String, default: uuidv4 },
+  name:     { type: String, required: true },
+  email:    { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  date:     { type: Date, default: Date.now }
 });
 
 // Event schema
 const eventSchema = new mongoose.Schema({
-  id:         { type: String, default: uuidv4 },
-  name:       String,
-  userId:     String,
-  date:       Date,
-  capacity:   Number,
-  description:String,
-  locationId: String
+  id:          { type: String, default: uuidv4 },
+  name:        { type: String, required: true },
+  userId:      { type: String, required: true },
+  date:        { type: Date, required: true },
+  capacity:    { type: Number, default: 0 },
+  description: { type: String, default: '' },
+  locationId:  { type: String, required: true }
 });
 
 // Question schema
 const questionSchema = new mongoose.Schema({
   id:           { type: String, default: uuidv4 },
-  text:         String,
-  eventId:      String,
-  category:     String,
-  deckPhase:    String,
+  text:         { type: String, required: true },
+  eventId:      { type: String, required: true },
+  category:     { type: String, required: true },
+  deckPhase:    { type: String, required: true },
   creationDate: { type: Date, default: Date.now },
   usageHistory: [{ locationId: String, date: Date }],
   performance: {
@@ -44,25 +43,25 @@ const questionSchema = new mongoose.Schema({
 // Feedback schema
 const feedbackSchema = new mongoose.Schema({
   id:           { type: String, default: uuidv4 },
-  questionId:   String,
-  eventId:      String,
-  locationId:   String,
-  feedbackType: String, // 'like' or 'dislike'
-  userId:       String,
+  questionId:   { type: String, required: true },
+  eventId:      { type: String, required: true },
+  locationId:   { type: String, required: true },
+  feedbackType: { type: String, required: true }, // 'like' or 'dislike'
+  userId:       { type: String },
   date:         { type: Date, default: Date.now }
 });
 
 // Location schema
 const locationSchema = new mongoose.Schema({
   id:   { type: String, default: uuidv4 },
-  name: String
+  name: { type: String, required: true }
 });
 
 // Deck schema (now referencing Question IDs)
 const deckSchema = new mongoose.Schema({
   id:         { type: String, default: uuidv4 },
-  accessCode: String,
-  eventId:    String,
+  accessCode: { type: String, required: true },
+  eventId:    { type: String, required: true },
   questions:  [{ type: String, ref: 'Question' }],
   date:       { type: Date, default: Date.now }
 });
