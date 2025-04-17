@@ -646,7 +646,7 @@ async function loadFeedback() {
         
         const questionsResponse = await fetch(`/api/questions/${eventId}`, {
             headers: {
-                'x-auth-token': localStorage.getItem('token')
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
         
@@ -710,7 +710,7 @@ async function displayFeedbackTable(questions) {
         try {
             const response = await fetch(`/api/feedback/stats/${question.id}`, {
                 headers: {
-                    'x-auth-token': localStorage.getItem('token')
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
             
