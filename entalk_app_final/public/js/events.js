@@ -588,26 +588,6 @@ async function generateDeck(e) {
         }
 
         console.log('Generating deck...');
-        const response = await fetch(`/api/decks/generate/${locationId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({ eventId })
-        });
-
-        const contentType = response.headers.get('content-type') || '';
-        if (!response.ok || !contentType.includes('application/json')) {
-            const errorText = await response.text();
-            console.error('Non-JSON or error response received:', errorText);
-            throw new Error('Failed to generate deck: ' + errorText);
-        }
-
-        const deck = await response.json();
-        displayDeckInfo(deck);
-        showAlert('Deck generated successfully', 'success');
-        console.log('Deck generated successfully:', deck.accessCode);
 
     } catch (error) {
         console.error('Error generating deck:', error);
@@ -660,26 +640,6 @@ async function generateDeck(e) {
         }
 
         console.log('Generating deck...');
-        const response = await fetch(`/api/decks/generate/${locationId}`, {  // Use the correct endpoint
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-                eventId
-            })
-        });
-
-        if (!response.ok) {
-            const errorBody = await response.json();
-            throw new Error(errorBody.message || 'Failed to generate deck');
-        }
-
-        const deck = await response.json();
-        displayDeckInfo(deck);
-        showAlert('Deck generated successfully', 'success');
-        console.log('Deck generated successfully:', deck.accessCode);
 
     } catch (error) {
         console.error('Error generating deck:', error);
