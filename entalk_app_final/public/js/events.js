@@ -355,7 +355,7 @@ async function selectEvent(eventId) {
         console.log('Selecting event:', eventId);
         currentEventId = eventId;
         
-        const eventSelects = document.querySelectorAll('#event-select, #feedback-event-select');
+        const eventSelects = document.querySelectorAll('#event-select, #feedback-event-select, #deck-event-select'); // Include deck-event-select
         eventSelects.forEach(select => {
             if (select) {
                 select.value = eventId;
@@ -363,7 +363,13 @@ async function selectEvent(eventId) {
         });
         
         const questionsSection = document.getElementById('questions-section');
-        
+        const deckSection = document.getElementById('deck-section'); // Get deck section
+        const feedbackContainer = document.getElementById('feedback-container');
+
+        if (deckSection) {
+            deckSection.style.display = 'block'; // Make deck section visible
+        }
+
     } catch (error) {
         console.error('Error selecting event:', error);
         showAlert('Failed to select event. Please try again.', 'danger');
