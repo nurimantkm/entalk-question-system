@@ -568,7 +568,7 @@ async function generateDeck(e) {
         console.log('Fetching event details...');
         showAlert('Generating deck... This may take a moment.', 'info');
 
-        const eventResponse = await fetch(`/api/events/${eventId}`, {
+        const eventResponse = await fetch(`/api/events/${eventId}`, {  // Keep this to get event details
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -579,7 +579,7 @@ async function generateDeck(e) {
         }
 
         const event = await eventResponse.json();
-        const locationId = event.locationId;
+        const locationId = event.locationId;  // Assuming event object has locationId
 
         console.log('Location ID from event:', locationId);
 
@@ -597,22 +597,37 @@ async function generateDeck(e) {
             body: JSON.stringify({ eventId })
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();  // FIXED: safe parsing
-            throw new Error(errorText || 'Failed to generate deck');
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok || !contentType.includes('application/json')) {
+            const errorText = await response.text();
+            console.error('Non-JSON or error response received:', errorText);
+            throw new Error('Failed to generate deck: ' + errorText);
         }
 
-        const contentType = response.headers.get('content-type') || '';
-if (!contentType.includes('application/json')) {
-    const errorHtml = await response.text();
-    console.error('Received non-JSON response:', errorHtml);
-    throw new Error('Invalid server response (not JSON)');
-}
+        const deck = await response.json();
+        displayDeckInfo(deck);
+        showAlert('Deck generated successfully', 'success');
+        console.log('Deck generated successfully:', deck.accessCode);
+        const response = await fetch(`/api/decks/generate/${locationId}`, {  // Use the correct endpoint
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                eventId
+            })
+        });
 
-const deck = await response.json();
-displayDeckInfo(deck);
-showAlert('Deck generated successfully', 'success');
-console.log('Deck generated successfully:', deck.accessCode);
+        if (!response.ok) {
+            const errorBody = await response.json();
+            throw new Error(errorBody.message || 'Failed to generate deck');
+        }
+
+        const deck = await response.json();
+        displayDeckInfo(deck);
+        showAlert('Deck generated successfully', 'success');
+        console.log('Deck generated successfully:', deck.accessCode);
 
     } catch (error) {
         console.error('Error generating deck:', error);
