@@ -8,7 +8,7 @@ const app = express();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateNoveltyQuestions } = require('./openaiService');
-const { generateQuestionDeck } = require('./questionService');
+const { generateQuestionDeck, getFeedbackStats } = require('./questionService');
 
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
@@ -494,6 +494,21 @@ app.get('/api/feedback/:eventId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get feedback error:', error);
     res.status(500).json({ error: 'Failed to retrieve feedback' });
+  }
+});
+
+// Get feedback stats for a specific question
+app.get('/api/feedback/stats/:questionId', authenticateToken, async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    
+    // Use the getFeedbackStats function from questionService.js
+    const stats = await getFeedbackStats(questionId);
+    
+    res.json(stats);
+  } catch (error) {
+    console.error('Get feedback stats error:', error);
+    res.status(500).json({ error: 'Failed to retrieve feedback stats' });
   }
 });
 
