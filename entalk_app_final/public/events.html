@@ -187,6 +187,24 @@
             </div>
         </div>
         
+        <div id="deck-section" class="section">
+            <h2>Generate Question Deck</h2>
+            <form id="generate-deck-form">
+                <div class="form-group">
+                    <label for="deck-event-select">Select Event for Deck</label>
+                    <select id="deck-event-select" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="deck-location-select">Select Location</label>
+                    <select id="deck-location-select" required></select>
+                </div>
+                <button type="submit" id="generate-deck-btn">Generate Deck</button>
+            </form>
+            
+            <div id="deck-info"></div>
+            <div id="qr-container"></div>
+        </div>
+
         <div id="questions-section" class="section">
             <h2>Generate Questions</h2>
             <form id="generate-questions-form">
@@ -217,23 +235,6 @@
             <button id="save-questions-btn" style="display: none;">Save Questions</button>
         </div>
         
-        <div id="deck-section" class="section">
-            <h2>Generate Question Deck</h2>
-            <form id="generate-deck-form">
-                <div class="form-group">
-                    <label for="deck-event-select">Select Event for Deck</label>
-                    <select id="deck-event-select" required></select>
-                </div>
-                <div class="form-group">
-                    <label for="deck-location-select">Select Location</label>
-                    <select id="deck-location-select" required></select>
-                </div>
-                <button type="submit" id="generate-deck-btn">Generate Deck</button>
-            </form>
-            
-            <div id="deck-info"></div>
-            <div id="qr-container"></div>
-        </div>
         
         <div class="section">
             <h2>Question Feedback</h2>
