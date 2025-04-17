@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
 // User schema
-const userSchema = new mongoose.Schema({
+theconst userSchema = new mongoose.Schema({
   id:        { type: String, default: uuidv4 },
   name:      String,
   email:     String,
@@ -14,12 +14,12 @@ const userSchema = new mongoose.Schema({
 
 // Event schema
 const eventSchema = new mongoose.Schema({
-  id:        { type: String, default: uuidv4 },
-  name:      String,
-  userId:    String,
-  date:      Date,
-  capacity:  Number,
-  description: String,
+  id:         { type: String, default: uuidv4 },
+  name:       String,
+  userId:     String,
+  date:       Date,
+  capacity:   Number,
+  description:String,
   locationId: String
 });
 
@@ -43,13 +43,13 @@ const questionSchema = new mongoose.Schema({
 
 // Feedback schema
 const feedbackSchema = new mongoose.Schema({
-  id:         { type: String, default: uuidv4 },
-  questionId: String,
-  eventId:    String,
-  locationId: String,
-  feedbackType: String, // e.g. 'like' or 'dislike'
-  userId:     String,
-  date:       { type: Date, default: Date.now }
+  id:           { type: String, default: uuidv4 },
+  questionId:   String,
+  eventId:      String,
+  locationId:   String,
+  feedbackType: String, // 'like' or 'dislike'
+  userId:       String,
+  date:         { type: Date, default: Date.now }
 });
 
 // Location schema
@@ -58,12 +58,12 @@ const locationSchema = new mongoose.Schema({
   name: String
 });
 
-// Deck schema (renamed to Deck)
+// Deck schema (now referencing Question IDs)
 const deckSchema = new mongoose.Schema({
   id:         { type: String, default: uuidv4 },
   accessCode: String,
   eventId:    String,
-  questions:  [String],   // array of question IDs
+  questions:  [{ type: String, ref: 'Question' }],
   date:       { type: Date, default: Date.now }
 });
 
@@ -75,7 +75,7 @@ const Feedback = mongoose.model('Feedback', feedbackSchema);
 const Location = mongoose.model('Location', locationSchema);
 const Deck     = mongoose.model('Deck', deckSchema);
 
-// Export all models, including Deck
+// Export all models
 module.exports = {
   User,
   Event,
