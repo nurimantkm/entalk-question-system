@@ -248,8 +248,8 @@ function getOrCreateUserId(){
         isDragging = false;
         startX = null;
         startY = null;
-
     });
+    }
 }
 
 // Reset card position after swipe
