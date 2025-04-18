@@ -1,29 +1,33 @@
 // server.js
 
-// Load environment variables
+// Load environment variables (from .env if present)
+require('dotenv').config();
+
 const path = require('path');
 const express = require('express');
-const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb+srv://EntalkAdmin:Pamyk3gara@entalk-cluster.hc0qztn.mongodb.net/?retryWrites=true&w=majority&appName=entalk-cluster';
-const JWT_SECRET = process.env.JWT_SECRET || 'entalk_jwt_secret_key_production';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const app = express();
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+
+// Import centralized models
+const { User, Event, Question, Feedback, Location, Deck } = require('./models');
 const { generateNoveltyQuestions } = require('./openaiService');
 const { generateQuestionDeck } = require('./questionService');
 
-const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
-// Import centralized models
-const { User, Event, Question, Feedback, Location, Deck } = require('./models');
+// Configure from environment
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
+const JWT_SECRET = process.env.JWT_SECRET || 'entalk_jwt_secret_key_production';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 // Connect to MongoDB
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected!'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+  .catch(err => console.error('MongoDB connection error:', err));
 
+const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Middleware for token authentication
 function authenticateToken(req, res, next) {
@@ -55,13 +59,13 @@ app.post('/api/register', async (req, res) => {
     }
     const existing = await User.findOne({ email });
     if (existing) {
-      return res.status(400).json({ error: 'Email in use' });
+      return res.status(400).json({ error: 'Email already in use' });
     }
     const hashed = await bcrypt.hash(password, 10);
     const newUser = new User({ name, email, password: hashed });
     await newUser.save();
     const token = jwt.sign({ id: newUser.id, name: newUser.name, email: newUser.email }, JWT_SECRET, { expiresIn: '24h' });
-    res.status(201).json({ message: 'User registered', token });
+    res.status(201).json({ message: 'User registered successfully', token });
   } catch (err) {
     console.error('Register error:', err);
     res.status(500).json({ error: 'Registration failed' });
@@ -75,12 +79,12 @@ app.post('/api/login', async (req, res) => {
     if (!user) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) {
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
     const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ message: 'Logged in', token });
+    res.json({ message: 'Logged in successfully', token });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
@@ -114,13 +118,14 @@ app.get('/api/events', authenticateToken, async (req, res) => {
 app.get('/api/locations', async (req, res) => {
   try {
     let locations = await Location.find();
-    if (!locations.length) {
-      locations = [
+    if (!locations || !locations.length) {
+      const defaults = [
         { id: 'loc1', name: 'Üsküdar' },
         { id: 'loc2', name: 'Bahçeşehir' },
         { id: 'loc3', name: 'Bostancı' }
       ];
-      await Location.insertMany(locations);
+      await Location.insertMany(defaults);
+      locations = defaults;
     }
     res.json(locations);
   } catch (err) {
@@ -131,11 +136,11 @@ app.get('/api/locations', async (req, res) => {
 
 // === QUESTIONS ===
 app.post('/api/questions', authenticateToken, async (req, res) => {
-  // ... existing question creation/generation logic ...
+  // Existing question creation & generation logic
 });
 
 app.get('/api/questions/:eventId', authenticateToken, async (req, res) => {
-  // ... existing feedback-augmented retrieval logic ...
+  // Existing feedback-augmented retrieval logic
 });
 
 // === DECK GENERATION ===
@@ -145,7 +150,7 @@ app.post('/api/events/:eventId/deck', authenticateToken, async (req, res) => {
     const event = await Event.findOne({ id: eventId });
     if (!event) return res.status(404).json({ error: 'Event not found' });
     if (event.userId !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
-
+    
     const deckData = await generateQuestionDeck(event.locationId, eventId);
     const newDeck = new Deck({ accessCode: uuidv4(), eventId, questions: deckData.questions.map(q => q.id) });
     await newDeck.save();
@@ -158,14 +163,14 @@ app.post('/api/events/:eventId/deck', authenticateToken, async (req, res) => {
 
 // === PARTICIPANT VIEW ===
 app.get('/api/decks/:accessCode', async (req, res) => {
-  // ... existing deck retrieval for participants ...
+  // Existing deck retrieval for participants
 });
 
 // === FEEDBACK ===
 app.post('/api/feedback', authenticateToken, async (req, res) => {
-  // ... existing feedback storage logic ...
+  // Existing feedback storage logic
 });
 
 // Start server
-const PORT = process.env.PORT || process.env.PORT;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
