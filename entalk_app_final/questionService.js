@@ -219,9 +219,10 @@ async function generateAIQuestions(categories, phases, count = 5) {
 
 // Generate a deck of questions for a location
 async function generateQuestionDeck(locationId, eventId) {
-  // 1. Get available questions for this location
-  const availableQuestions = getAvailableQuestionsForLocation(locationId);
-  
+  // 1. Get available questions for this location **and** event
+  let availableQuestions = getAvailableQuestionsForLocation(locationId);
+  availableQuestions = availableQuestions.filter(q => q.eventId === eventId);
+
   // 2. Calculate scores for all questions
   availableQuestions.forEach(q => q.calculateScore());
   
