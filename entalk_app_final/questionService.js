@@ -260,30 +260,17 @@ async function generateQuestionDeck(locationId, eventId) {
   }
   
   // 7. Record usage for all selected questions and get the complete question objects
-    const questionsForDeck = [];
-  selectedQuestions.forEach(q => q.recordUsage(locationId));
-      questionsForDeck.push(q);
+  const questionsForDeck = selectedQuestions.map(q => {
+    q.recordUsage(locationId);
+    return q;
+  });
 
-
-  // 8. Create the deck object
-  const questionIds = selectedQuestions.map(q => q.id);
-  const deck = new QuestionDeck(eventId, locationId, questionIds);
-  global.questionDecks.push(deck);
-  
-  return deck;
-}
-
-// Get a deck by access code
-async function generateQuestionDeck(locationId, eventId) {
-   // ... (existing code)
-
-    // 7. Record usage for all selected questions and get the complete question objects
-    const questionsForDeck = selectedQuestions.map(q => { q.recordUsage(locationId); return q });
-
-    // 8. Return the deck
+  // 8. Return the deck
   return {
-    ...deck,
-    questions
+    accessCode: uuidv4(),
+    eventId,
+    locationId,
+    questions: questionsForDeck
   };
 }
 
