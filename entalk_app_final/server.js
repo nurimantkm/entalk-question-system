@@ -1,4 +1,3 @@
-// server.js
 // Load environment variables
 const path = require('path');
 const express = require('express');
@@ -9,13 +8,10 @@ const app = express();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { generateNoveltyQuestions } = require('./openaiService');
-const { generateQuestionDeck, getFeedbackStats } = require('./questionService');
+const { generateQuestionDeck } = require('./questionService');
 
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
-
-// Import Mongoose models
-const { User, Event, Question, Feedback, Location, Deck } = require('./models');
 
 if (OPENAI_API_KEY) {
   console.log('OpenAI API key initialized.');
@@ -28,6 +24,64 @@ if (OPENAI_API_KEY) {
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected!'))
   .catch((err) => console.error('MongoDB connection error:', err));
+
+// Define Mongoose Schemas and Models
+
+const userSchema = new mongoose.Schema({
+  id: { type: String, default: uuidv4 },
+  name: String,
+  email: { type: String, unique: true },
+  password: String,
+  createdAt: { type: Date, default: Date.now }
+});
+const User = mongoose.model('User', userSchema);
+
+const eventSchema = new mongoose.Schema({
+  id: { type: String, default: uuidv4 },
+  name: String,
+  userId: String,
+  date: { type: Date, default: Date.now },
+  capacity: { type: Number, default: 20 },
+  description: String,
+  locationId: String,
+  createdAt: { type: Date, default: Date.now }
+});
+const Event = mongoose.model('Event', eventSchema);
+
+const questionSchema = new mongoose.Schema({
+  id: { type: String, default: uuidv4 },
+  text: String,
+  eventId: String,
+  category: String,
+  deckPhase: String,
+  createdAt: { type: Date, default: Date.now }
+});
+const Question = mongoose.model('Question', questionSchema);
+
+const feedbackSchema = new mongoose.Schema({
+  id: { type: String, default: uuidv4 },
+  questionId: String,
+  eventId: String,
+  locationId: String,
+  feedbackType: String,
+  userId: String,
+  createdAt: { type: Date, default: Date.now }
+});
+const Feedback = mongoose.model('Feedback', feedbackSchema);
+
+const locationSchema = new mongoose.Schema({
+  id: String,
+  name: String
+});
+const Location = mongoose.model('Location', locationSchema);
+
+const deckSchema = new mongoose.Schema({
+  accessCode: String,
+  eventId: String,
+  questions: [questionSchema],
+  date: { type: Date, default: Date.now }
+});
+const Deck = mongoose.model('Deck', deckSchema);
 
 // Initialize Express app
 
@@ -137,21 +191,6 @@ app.get('/api/events', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve events' });
   }
 });
-
-// Get a single event by ID
-app.get('/api/events/:id', authenticateToken, async (req, res) => {
-  try {
-    const ev = await Event.findOne({ id: req.params.id });
-    if (!ev) {
-      return res.status(404).json({ error: 'Event not found' });
-    }
-    res.json(ev);
-  } catch (err) {
-    console.error('Error fetching event:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 
 // Get all locations (initialize defaults if needed)
 app.get('/api/locations', async (req, res) => {
@@ -303,12 +342,24 @@ app.post('/api/decks/generate/:locationId', authenticateToken, async (req, res) 
     if (event.userId !== req.user.id) return res.status(403).json({ error: 'Not authorized for this event' });
     
     // Generate deck using questionService
-    const deck = await generateQuestionDeck(locationId, eventId);
+    const deckData = await generateQuestionDeck(locationId, eventId); // Changed here
 
-    res.json(deck);
+    // Save the generated deck
+    const newDeck = new Deck({
+      accessCode: uuidv4(),
+      eventId,
+      questions: deckData.questions,
+      date: new Date().toISOString()
+    });
+    
+     await newDeck.save();
+
+     console.log(`Deck created with ID: ${newDeck.id} and access code: ${newDeck.accessCode}`);
+
+    res.json(newDeck);
   } catch (error) {
     console.error('Generate deck error:', error);
-    res.status(500).json({ error: 'Failed to generate deck: ' + error.message }); // Include error message
+    res.status(500).json({ error: 'Failed to generate deck' });
   }
 });
 
@@ -316,7 +367,7 @@ app.post('/api/decks/generate/:locationId', authenticateToken, async (req, res) 
 app.get('/api/decks/:accessCode', async (req, res) => {
   try {
     const { accessCode } = req.params;
-    const deck = await Deck.findOne({ accessCode }).populate('questions');
+    const deck = await Deck.findOne({ accessCode });
     if (!deck) return res.status(404).json({ error: 'Deck not found' });
     res.json(deck);
   } catch (error) {
@@ -329,26 +380,14 @@ app.get('/api/decks/:accessCode', async (req, res) => {
 app.post('/api/feedback', async (req, res) => {
   try {
     const { questionId, eventId, locationId, feedbackType, userId } = req.body;
-     if (!questionId || !eventId || !locationId || !feedbackType) {
-      return res.status(400).json({ error: 'Question ID, event ID, location ID, and feedback are required' });
+    if (!questionId || !eventId || !locationId || !feedbackType) {
+      return res.status(400).json({ error: 'Question ID, event ID, location ID, and feedback type are required' });
     }
-
-    // Create new feedback record
-    const newFeedback = new Feedback({ questionId, eventId, locationId, feedbackType, userId }); // Assuming userId is optional for now
-    await newFeedback.save();
-
-     // Update question performance in the database
-     const question = await Question.findOne({ id: questionId });
-     if (question) {
-       if (feedbackType === 'like') {
-         question.performance.likes++;
-       } else if (feedbackType === 'dislike') {
-         question.performance.dislikes++;
-       }
-       await question.save();
-     }
-    res.status(201).json({ message: 'Feedback recorded successfully', feedback: newFeedback });
     
+    const newFeedback = new Feedback(questionId, eventId, locationId, feedbackType, userId);
+    await newFeedback.save();
+    
+    res.status(201).json({ message: 'Feedback recorded successfully', feedback: newFeedback });
   } catch (error) {
     console.error('Record feedback error:', error);
     res.status(500).json({ error: 'Failed to record feedback' });
@@ -458,25 +497,6 @@ app.get('/api/feedback/:eventId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get feedback error:', error);
     res.status(500).json({ error: 'Failed to retrieve feedback' });
-  }
-});
-
-// Get feedback stats for a specific question
-app.get('/api/feedback/stats/:questionId', authenticateToken, async (req, res) => {
-  try {
-    const { questionId } = req.params;
-
-    const question = await Question.findOne({ id: questionId });
-    if (!question) {
-      return res.status(404).json({ error: 'Question not found' });
-    }
-
-    const stats = await getFeedbackStats(questionId);
-
-    res.json(stats);
-    } catch (error) {
-    console.error('Get feedback stats error:', error);
-    res.status(500).json({ error: 'Failed to retrieve feedback stats' });
   }
 });
 
