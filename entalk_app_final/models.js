@@ -1,5 +1,3 @@
-// models.js
-
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
@@ -67,13 +65,13 @@ const deckSchema = new mongoose.Schema({
   date:       { type: Date, default: Date.now }
 });
 
-// Model registrations
-const User     = mongoose.model('User', userSchema);
-const Event    = mongoose.model('Event', eventSchema);
-const Question = mongoose.model('Question', questionSchema);
-const Feedback = mongoose.model('Feedback', feedbackSchema);
-const Location = mongoose.model('Location', locationSchema);
-const Deck     = mongoose.model('Deck', deckSchema);
+// Model registrations with overwrite guard
+const User     = mongoose.models.User     || mongoose.model('User', userSchema);
+const Event    = mongoose.models.Event    || mongoose.model('Event', eventSchema);
+const Question = mongoose.models.Question || mongoose.model('Question', questionSchema);
+const Feedback = mongoose.models.Feedback || mongoose.model('Feedback', feedbackSchema);
+const Location = mongoose.models.Location || mongoose.model('Location', locationSchema);
+const Deck     = mongoose.models.Deck     || mongoose.model('Deck', deckSchema);
 
 // Export all models
 module.exports = {
