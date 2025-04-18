@@ -274,13 +274,9 @@ async function generateQuestionDeck(locationId, eventId) {
   };
 }
 
+// Export the functions directly
 module.exports = {
- async function generateQuestionDeck(locationId, eventId) {
-    // ... (existing code)
-    // after selecting the questions
-    return { accessCode: uuidv4(), eventId, locationId, questions: questionsForDeck };
-  // REMOVED: initializeLocations,
-  getLocations, // Added this function to access locations
+  getLocations,
   getQuestionCategories,
   getDeckPhases,
   getCategoryDescription,
@@ -288,6 +284,6 @@ module.exports = {
   createQuestions,
   recordFeedback,
   getFeedbackStats,
-  getAvailableQuestionsForLocation,
+  getAvailableQuestionsForLocation,  
   generateQuestionDeck
 };
